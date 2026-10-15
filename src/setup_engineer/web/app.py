@@ -10,6 +10,7 @@ import re
 import secrets
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import markdown as md
@@ -25,7 +26,7 @@ from starlette.templating import Jinja2Templates
 from .. import __version__
 from ..ibt import IbtError, IbtFile
 from ..recommend.history import History
-from . import discord
+from . import discord, progress
 from .config import Settings, load_settings
 from .db import Database, now
 from .worker import DONE, FAILED, QUEUED, Worker, report_text
@@ -116,8 +117,36 @@ def create_app(settings: Settings | None = None) -> Starlette:
         uid = request.session.get("uid")
         return db.get_user(uid) if uid else None
 
-    def is_admin(user: dict | None) -> bool:
+    def is_banned(user: dict | None) -> bool:
+        if not user or not user.get("banned_at"):
+            return False
+        until = user.get("banned_until")
+        if until and until <= now():
+            db.unban_user(user["discord_id"])  # Befristung abgelaufen
+            user["banned_at"] = None
+            return False
+        return True
+
+    def is_owner(user: dict | None) -> bool:
+        """Haupt-Admin aus portal.env – kann über die Oberfläche nicht gesperrt oder entfernt werden."""
         return bool(user and user["discord_id"] in s.admin_discord_ids)
+
+    def is_admin(user: dict | None) -> bool:
+        return bool(user and (is_owner(user) or user.get("is_admin")) and not is_banned(user))
+
+    def guidelines_version() -> str:
+        rnd = db.get_setting("guidelines_round", "0")
+        return GUIDELINES_VERSION if rnd in ("", "0") else f"{GUIDELINES_VERSION}.{rnd}"
+
+    def ban_message(request: Request, user: dict) -> Response:
+        until = f" bis {fmt_date(user['banned_until'])}" if user.get("banned_until") else ""
+        reason = f" Grund: {user['ban_reason'].rstrip('.')}." if user.get("ban_reason") else ""
+        return message(
+            request,
+            "Zugang gesperrt",
+            f"Dein Zugang zum Portal ist{until} gesperrt.{reason} Bei Fragen meld dich bei den Admins im Discord.",
+            403,
+        )
 
     def csrf_token(request: Request) -> str:
         tok = request.session.get("csrf")
@@ -132,29 +161,53 @@ def create_app(settings: Settings | None = None) -> Starlette:
 
     def render(request: Request, name: str, status_code: int = 200, **ctx) -> Response:
         user = current_user(request)
-        ctx.update(request=request, user=user, admin=is_admin(user), csrf=csrf_token(request))
+        ctx.update(
+            request=request,
+            user=user,
+            admin=is_admin(user),
+            csrf=csrf_token(request),
+            announcement=db.get_setting("announcement"),
+        )
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
     def message(request: Request, title: str, text: str, status_code: int = 200, action: tuple[str, str] | None = None) -> Response:
         return render(request, "message.html", status_code=status_code, title=title, text=text, action=action)
 
     def guidelines_ok(user: dict | None) -> bool:
-        return bool(user and user.get("guidelines_version") == GUIDELINES_VERSION)
+        return bool(user and user.get("guidelines_version") == guidelines_version())
 
     def require_user(request: Request) -> dict | Response:
         user = current_user(request)
         if user is None:
             return RedirectResponse("/", status_code=303)
+        if is_banned(user):
+            return ban_message(request, user)
         if not user["consent_at"]:
             return RedirectResponse("/einwilligung", status_code=303)
         return user
 
+    def require_admin(request: Request) -> dict | Response:
+        user = require_user(request)
+        if isinstance(user, Response):
+            return user
+        if not is_admin(user):
+            return message(request, "Kein Zugriff", "Diese Seite ist nur für die Projekt-Admins.", 403)
+        return user
+
     # ----------------------------------------------------------- Seiten
     async def landing(request: Request) -> Response:
-        user = current_user(request)
-        if user and user["consent_at"]:
-            return RedirectResponse("/meine-daten", status_code=303)
         return render(request, "landing.html", hero=hero, totals=db.totals(), discord_ready=s.discord_configured)
+
+    async def project(request: Request) -> Response:
+        return render(
+            request,
+            "projekt.html",
+            totals=db.totals(),
+            coverage=db.coverage(),
+            goal1=GOAL_STAGE1,
+            goal2=GOAL_STAGE2,
+            discord_ready=s.discord_configured,
+        )
 
     async def login(request: Request) -> Response:
         if not s.discord_configured:
@@ -196,6 +249,10 @@ def create_app(settings: Settings | None = None) -> Starlette:
                 403,
             )
         db.upsert_user(profile.id, profile.username, profile.display_name, profile.avatar_url, profile.roles)
+        known = db.get_user(profile.id)
+        if is_banned(known):
+            request.session.clear()
+            return ban_message(request, known)
         request.session.clear()
         request.session["uid"] = profile.id
         user = db.get_user(profile.id)
@@ -247,7 +304,17 @@ def create_app(settings: Settings | None = None) -> Starlette:
             guidelines_ok=guidelines_ok(user),
             guidelines_renewed=bool(user.get("guidelines_version")) and not guidelines_ok(user),
             next_tests=db.next_tests(user["discord_id"]),
+            paused=uploads_paused(user),
+            pause_message=db.get_setting("pause_message"),
         )
+
+    def uploads_paused(user: dict | None) -> bool:
+        return db.get_setting("uploads_paused") == "1" and not is_admin(user)
+
+    async def progress_page(request: Request) -> Response:
+        data = await asyncio.to_thread(progress.build, db, s.history_path, GOAL_STAGE1, GOAL_STAGE2)
+        members = sum(1 for p in db.users_with_stats() if p["consent_at"] and not p["banned_at"])
+        return render(request, "fortschritt.html", p=data, members=members)
 
     async def guidelines(request: Request) -> Response:
         return render(request, "leitfaden.html")
@@ -261,7 +328,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             return message(request, "Sitzung abgelaufen", "Bitte die Seite neu laden.", 400)
         if form.get("gelesen") != "ja":
             return RedirectResponse("/meine-daten?leitfaden=fehlt#leitfaden", status_code=303)
-        db.set_guidelines(user["discord_id"], GUIDELINES_VERSION)
+        db.set_guidelines(user["discord_id"], guidelines_version())
         return RedirectResponse("/meine-daten#upload", status_code=303)
 
     async def report(request: Request) -> Response:
@@ -291,23 +358,270 @@ def create_app(settings: Settings | None = None) -> Starlette:
         db.delete_upload(row["id"])
         return RedirectResponse("/meine-daten", status_code=303)
 
-    async def admin(request: Request) -> Response:
-        user = require_user(request)
+    # ------------------------------------------------------- Verwaltung
+    def person_view(p: dict) -> dict:
+        p = dict(p)
+        p["banned"] = is_banned(p)
+        p["owner"] = is_owner(p)
+        p["is_admin_any"] = p["owner"] or bool(p.get("is_admin"))
+        p["guide_ok"] = p.get("guidelines_version") == guidelines_version()
+        return p
+
+    def upload_view(u: dict) -> dict:
+        u = dict(u)
+        u["ab"] = json.loads(u["ab_summary"]) if u.get("ab_summary") else None
+        return u
+
+    async def admin_home(request: Request) -> Response:
+        user = require_admin(request)
         if isinstance(user, Response):
             return user
-        if not is_admin(user):
-            return message(request, "Kein Zugriff", "Diese Seite ist nur für die Projekt-Admins.", 403)
+        recent = [upload_view(u) for u in db.all_uploads(limit=8)]
         return render(
             request,
-            "admin.html",
-            people=db.users_with_stats(),
-            guidelines_version=GUIDELINES_VERSION,
-            coverage=db.coverage(),
+            "admin/uebersicht.html",
+            section="uebersicht",
+            stats=db.admin_stats(),
             totals=db.totals(),
+            coverage=db.coverage(),
             goal1=GOAL_STAGE1,
             goal2=GOAL_STAGE2,
-            failed=db.uploads_by_status(FAILED),
+            failed=[upload_view(u) for u in db.all_uploads(status=FAILED, limit=50)],
+            recent=recent,
+            log=db.log_entries(limit=8),
+            paused=db.get_setting("uploads_paused") == "1",
         )
+
+    async def admin_people(request: Request) -> Response:
+        user = require_admin(request)
+        if isinstance(user, Response):
+            return user
+        q = request.query_params.get("q", "").strip().lower()
+        filt = request.query_params.get("filter", "")
+        people = [person_view(p) for p in db.users_with_stats()]
+        if q:
+            people = [p for p in people if q in (p["username"] or "").lower() or q in (p["display_name"] or "").lower() or q in p["discord_id"]]
+        if filt == "gesperrt":
+            people = [p for p in people if p["banned"]]
+        elif filt == "admins":
+            people = [p for p in people if p["is_admin_any"]]
+        elif filt == "ohne-upload":
+            people = [p for p in people if not p["uploads"]]
+        return render(request, "admin/teilnehmer.html", section="teilnehmer", people=people, q=q, filt=filt)
+
+    async def admin_person(request: Request) -> Response:
+        user = require_admin(request)
+        if isinstance(user, Response):
+            return user
+        uid = request.path_params["uid"]
+        row = next((p for p in db.users_with_stats() if p["discord_id"] == uid), None)
+        if row is None:
+            return message(request, "Nicht gefunden", "Diesen Teilnehmer gibt es nicht (mehr).", 404, ("/admin/teilnehmer", "Zu den Teilnehmern"))
+        return render(
+            request,
+            "admin/person.html",
+            section="teilnehmer",
+            p=person_view(row),
+            uploads=[upload_view(u) for u in db.all_uploads(user_id=uid)],
+            log=db.log_entries(limit=50, target_user=uid),
+            self_view=uid == user["discord_id"],
+        )
+
+    async def admin_uploads(request: Request) -> Response:
+        user = require_admin(request)
+        if isinstance(user, Response):
+            return user
+        qp = request.query_params
+        f = {k: qp.get(k, "").strip() for k in ("status", "car", "excluded", "q")}
+        rows = [upload_view(u) for u in db.all_uploads(**f, limit=500)]
+        return render(request, "admin/uploads.html", section="uploads", uploads=rows, f=f, cars=db.cars(), statuses=[QUEUED, "läuft", DONE, FAILED])
+
+    async def admin_log(request: Request) -> Response:
+        user = require_admin(request)
+        if isinstance(user, Response):
+            return user
+        return render(request, "admin/protokoll.html", section="protokoll", log=db.log_entries(limit=500))
+
+    async def admin_settings(request: Request) -> Response:
+        user = require_admin(request)
+        if isinstance(user, Response):
+            return user
+        return render(
+            request,
+            "admin/einstellungen.html",
+            section="einstellungen",
+            announcement=db.get_setting("announcement"),
+            paused=db.get_setting("uploads_paused") == "1",
+            pause_message=db.get_setting("pause_message"),
+            guide_version=guidelines_version(),
+            guide_confirmed=sum(1 for p in db.users_with_stats() if p.get("guidelines_version") == guidelines_version()),
+            owners=sorted(s.admin_discord_ids),
+            saved=request.query_params.get("ok") == "1",
+        )
+
+    # Wissen aus Uploads entfernen bzw. neu aufbauen
+    def forget_tests(rows: list[dict]) -> None:
+        refs = {f"{r['user_id']}/{r['filename']}" for r in rows}
+        h = History(s.history_path)
+        before = len(h.records)
+        h.records = [rec for rec in h.records if rec.file_a not in refs and rec.file_b not in refs]
+        if len(h.records) != before:
+            h.save()
+
+    def with_pair(row: dict) -> list[dict]:
+        return db.pair_members(row["pair_id"]) if row.get("pair_id") else [row]
+
+    def reanalyse(rows: list[dict]) -> None:
+        forget_tests(rows)
+        for r in rows:
+            db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None)
+        for r in rows:
+            worker.submit(r["id"])
+
+    def delete_uploads(rows: list[dict]) -> None:
+        for r in rows:
+            _remove_upload_files(s, r)
+            if r.get("pair_id") and r.get("ab_report_path"):
+                Path(r["ab_report_path"]).unlink(missing_ok=True)
+            db.delete_upload(r["id"])
+
+    BAN_DAYS = {"1": 1, "7": 7, "30": 30}
+
+    async def admin_action(request: Request) -> Response:
+        admin_user = require_admin(request)
+        if isinstance(admin_user, Response):
+            return admin_user
+        form = await request.form()
+        if not csrf_ok(request, form.get("csrf")):
+            return message(request, "Sitzung abgelaufen", "Bitte die Seite neu laden.", 400)
+        action = str(form.get("action") or "")
+        back = str(form.get("back") or "/admin")
+        if not back.startswith("/admin"):
+            back = "/admin"
+        reason = str(form.get("reason") or "").strip()[:500]
+
+        def deny(text: str) -> Response:
+            return message(request, "Nicht möglich", text, 400, (back, "Zurück"))
+
+        # ---------------------------------------------------- Einstellungen
+        if action == "einstellungen":
+            ann = str(form.get("announcement") or "").strip()[:600]
+            paused = form.get("paused") == "1"
+            note = str(form.get("pause_message") or "").strip()[:300]
+            changes = []
+            if ann != db.get_setting("announcement"):
+                changes.append("Ankündigung " + ("gesetzt" if ann else "entfernt"))
+            if paused != (db.get_setting("uploads_paused") == "1"):
+                changes.append("Uploads " + ("pausiert" if paused else "wieder offen"))
+            db.set_setting("announcement", ann)
+            db.set_setting("uploads_paused", "1" if paused else "0")
+            db.set_setting("pause_message", note)
+            if changes:
+                db.log(admin_user, "Einstellungen", detail=", ".join(changes))
+            return RedirectResponse("/admin/einstellungen?ok=1", status_code=303)
+        if action == "leitfaden_alle":
+            rnd = int(db.get_setting("guidelines_round", "0") or 0) + 1
+            db.set_setting("guidelines_round", str(rnd))
+            db.log(admin_user, "Leitfaden von allen neu bestätigen lassen", detail=reason)
+            return RedirectResponse("/admin/einstellungen?ok=1", status_code=303)
+        if action == "alles_neu":
+            rows = db.all_uploads(limit=1_000_000)
+            h = History(s.history_path)
+            h.records = []
+            h.save()
+            for r in rows:
+                db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None)
+            for r in rows:
+                worker.submit(r["id"])
+            db.log(admin_user, "Alle Uploads neu auswerten", detail=f"{len(rows)} Dateien")
+            return RedirectResponse("/admin/uploads", status_code=303)
+
+        # ---------------------------------------------------------- Uploads
+        if form.get("upload_id"):
+            row = db.get_upload(str(form.get("upload_id")))
+            if row is None:
+                return deny("Diesen Upload gibt es nicht mehr.")
+            owner = db.get_user(row["user_id"])
+            group = with_pair(row)
+            label = row["filename"] + (" (Garage-Paar)" if row.get("pair_id") else "")
+            if action == "aussortieren":
+                forget_tests(group)
+                for r in group:
+                    db.exclude_upload(r["id"], reason, admin_user["discord_id"])
+                db.log(admin_user, "Upload aussortiert", owner, row["id"], f"{label}" + (f" – {reason}" if reason else ""))
+            elif action == "werten":
+                for r in group:
+                    db.include_upload(r["id"])
+                reanalyse(group)
+                db.log(admin_user, "Upload wieder gewertet", owner, row["id"], label)
+            elif action == "neu_auswerten":
+                reanalyse(group)
+                db.log(admin_user, "Upload neu ausgewertet", owner, row["id"], label)
+            elif action == "loeschen":
+                delete_uploads(group)
+                db.log(admin_user, "Upload gelöscht", owner, row["id"], f"{label}" + (f" – {reason}" if reason else ""))
+            else:
+                return deny("Unbekannte Aktion.")
+            return RedirectResponse(back, status_code=303)
+
+        # -------------------------------------------------------- Teilnehmer
+        target = db.get_user(str(form.get("user_id") or ""))
+        if target is None:
+            return deny("Diesen Teilnehmer gibt es nicht (mehr).")
+        is_self = target["discord_id"] == admin_user["discord_id"]
+        if action in ("sperren", "rauswerfen", "admin_nehmen") and (is_self or is_owner(target)):
+            return deny("Haupt-Admins aus portal.env und das eigene Konto lassen sich hier nicht sperren, entfernen oder herabstufen.")
+        uploads = db.all_uploads(user_id=target["discord_id"], limit=1_000_000)
+        if action == "sperren":
+            days = BAN_DAYS.get(str(form.get("days") or ""))
+            until = (datetime.now(timezone.utc) + timedelta(days=days)).isoformat(timespec="seconds") if days else None
+            db.ban_user(target["discord_id"], reason, until, admin_user["discord_id"])
+            extra = []
+            if form.get("exclude") == "1":
+                forget_tests(uploads)
+                for r in uploads:
+                    db.exclude_upload(r["id"], "Teilnehmer gesperrt" + (f": {reason}" if reason else ""), admin_user["discord_id"])
+                extra.append("Daten aussortiert")
+            if form.get("delete") == "1":
+                delete_uploads(uploads)
+                extra.append("Dateien gelöscht")
+            dauer = f"{days} Tage" if days else "dauerhaft"
+            db.log(admin_user, "Gesperrt", target, detail=f"{dauer}" + (f" – {reason}" if reason else "") + (f" ({', '.join(extra)})" if extra else ""))
+        elif action == "entsperren":
+            db.unban_user(target["discord_id"])
+            db.log(admin_user, "Entsperrt", target, detail=reason)
+        elif action == "rauswerfen":
+            delete_uploads(uploads)
+            db.delete_user(target["discord_id"])
+            db.log(admin_user, "Entfernt (Konto und Daten gelöscht)", target, detail=(f"{len(uploads)} Dateien" + (f" – {reason}" if reason else "")))
+            return RedirectResponse("/admin/teilnehmer", status_code=303)
+        elif action == "daten_aussortieren":
+            forget_tests(uploads)
+            for r in uploads:
+                db.exclude_upload(r["id"], reason, admin_user["discord_id"])
+            db.log(admin_user, "Alle Daten aussortiert", target, detail=reason)
+        elif action == "daten_werten":
+            ex = [r for r in uploads if r["excluded_at"]]
+            for r in ex:
+                db.include_upload(r["id"])
+            reanalyse(ex)
+            db.log(admin_user, "Alle Daten wieder gewertet", target, detail=f"{len(ex)} Dateien")
+        elif action == "admin_geben":
+            db.set_user_admin(target["discord_id"], True)
+            db.log(admin_user, "Zum Admin gemacht", target)
+        elif action == "admin_nehmen":
+            db.set_user_admin(target["discord_id"], False)
+            db.log(admin_user, "Admin-Rechte entzogen", target)
+        elif action == "leitfaden_zuruecksetzen":
+            db.reset_guidelines(target["discord_id"])
+            db.log(admin_user, "Leitfaden muss neu bestätigt werden", target, detail=reason)
+        elif action == "notiz":
+            note = str(form.get("note") or "").strip()[:2000]
+            db.set_user_note(target["discord_id"], note)
+            db.log(admin_user, "Notiz geändert", target)
+        else:
+            return deny("Unbekannte Aktion.")
+        return RedirectResponse(back, status_code=303)
 
     async def privacy(request: Request) -> Response:
         return render(request, "privacy.html")
@@ -329,8 +643,13 @@ def create_app(settings: Settings | None = None) -> Starlette:
             return await reject(request, "Du bist nicht mehr angemeldet – bitte die Seite neu laden und anmelden.", 401)
         if not csrf_ok(request, request.headers.get("x-csrf-token")):
             return await reject(request, "Sitzung abgelaufen – bitte die Seite neu laden.", 400)
+        if is_banned(user):
+            return await reject(request, "Dein Zugang ist gesperrt.", 403)
         if not guidelines_ok(user):
             return await reject(request, "Bitte zuerst den Test-Leitfaden lesen und bestätigen.", 403)
+        if uploads_paused(user):
+            note = db.get_setting("pause_message")
+            return await reject(request, "Uploads sind gerade pausiert." + (f" {note}" if note else ""), 503)
         limit = s.max_upload_mb * 1024 * 1024
         declared = int(request.headers.get("content-length") or 0)
         if declared > limit * s.max_files_per_upload + 1024 * 1024:
@@ -440,7 +759,15 @@ def create_app(settings: Settings | None = None) -> Starlette:
         Route("/bericht/{upload_id}", report),
         Route("/bericht/{upload_id}/{kind}", report),
         Route("/upload/{upload_id}/loeschen", delete_upload, methods=["POST"]),
-        Route("/admin", admin),
+        Route("/projekt", project),
+        Route("/fortschritt", progress_page),
+        Route("/admin", admin_home),
+        Route("/admin/teilnehmer", admin_people),
+        Route("/admin/teilnehmer/{uid}", admin_person),
+        Route("/admin/uploads", admin_uploads),
+        Route("/admin/protokoll", admin_log),
+        Route("/admin/einstellungen", admin_settings),
+        Route("/admin/aktion", admin_action, methods=["POST"]),
         Route("/datenschutz", privacy),
         Route("/leitfaden", guidelines),
         Route("/leitfaden/bestaetigen", guidelines_confirm, methods=["POST"]),

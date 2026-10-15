@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Teilnehmer – Verwaltung{% endblock %}
+{% block content %}
+<div class="wrap page">
+  {% include "admin/_tabs.html" %}
+  <h1>Teilnehmer</h1>
+  <form class="filters" method="get" action="/admin/teilnehmer">
+    <label><span>Suche</span><input type="search" name="q" value="{{ q }}" placeholder="Name oder Discord-ID"></label>
+    <label><span>Zeigen</span>
+      <select name="filter">
+        {% for v, l in [("", "alle"), ("gesperrt", "gesperrt"), ("admins", "Admins"), ("ohne-upload", "ohne Upload")] %}
+          <option value="{{ v }}" {% if filt == v %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn-small">Filtern</button>
+  </form>
+  {% if people %}
+  <div class="table-scroll">
+    <table class="timing admin-table">
+      <thead><tr><th>Name</th><th>Status</th><th class="num">Uploads</th><th class="num">Tests</th><th class="num">Aussortiert</th><th>Letzter Upload</th><th>Letzter Login</th><th>Leitfaden</th></tr></thead>
+      <tbody>
+      {% for p in people %}
+        <tr class="{% if p.banned %}is-banned{% endif %}">
+          <td><a class="person" href="/admin/teilnehmer/{{ p.discord_id }}">{% if p.avatar %}<img src="{{ p.avatar }}" alt="" width="24" height="24">{% endif %}{{ p.display_name or p.username }}</a><span class="sub">{{ p.username }}</span></td>
+          <td>
+            {% if p.banned %}<span class="state state-fehler">gesperrt</span>{% if p.banned_until %}<span class="sub">bis {{ p.banned_until | datum }}</span>{% endif %}
+            {% elif not p.consent_at %}<span class="state">Einwilligung offen</span>
+            {% else %}<span class="state state-fertig">aktiv</span>{% endif %}
+            {% if p.owner %}<span class="state state-admin">Haupt-Admin</span>{% elif p.is_admin %}<span class="state state-admin">Admin</span>{% endif %}
+          </td>
+          <td class="num">{{ p.uploads }}</td><td class="num">{{ p.tests }}</td><td class="num">{{ p.excluded or "–" }}</td>
+          <td>{{ p.last_upload | datum }}</td><td>{{ p.last_login | datum }}</td>
+          <td>{% if p.guide_ok %}<span class="state state-fertig">bestätigt</span>{% elif p.guidelines_version %}<span class="state">alte Fassung</span>{% else %}<span class="state">offen</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="fine">{{ people | length }} Einträge. Klick auf einen Namen zum Sperren, Entfernen, für Notizen und Uploads.</p>
+  {% else %}<p class="empty">Niemand gefunden.</p>{% endif %}
+</div>
+{% endblock %}

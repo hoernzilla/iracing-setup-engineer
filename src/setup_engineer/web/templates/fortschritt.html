@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Fortschritt{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <p class="kicker">Fortschritt</p>
+  <h1>Wo das Projekt steht</h1>
+  <p class="lead">Aktualisiert sich mit jedem Upload. Gezählt wird nur, was in das gemeinsame Wissen einfließt –
+    aussortierte Dateien nicht.</p>
+
+  <dl class="kpis">
+    <div><dt>Fahrer mit Daten</dt><dd>{{ p.totals.drivers }}<small> von {{ members }} angemeldet</small></dd></div>
+    <div><dt>Tests</dt><dd>{{ p.totals.tests }}</dd></div>
+    <div><dt>Sessions</dt><dd>{{ p.totals.sessions }}</dd></div>
+    <div><dt>Gewertete Runden</dt><dd>{{ p.totals.laps }}</dd></div>
+    <div><dt>Fahrzeit</dt><dd>{{ "%.0f"|format(p.totals.hours) if p.totals.hours >= 10 else "%.1f"|format(p.totals.hours) }}<small> Stunden</small></dd></div>
+    <div><dt>Autos / Strecken</dt><dd>{{ p.totals.cars }}<small> / {{ p.totals.tracks }}</small></dd></div>
+  </dl>
+
+  <section class="block">
+    <h2>Phasen</h2>
+    <ol class="phases">
+      {% for ph in p.phases %}
+        <li class="phase phase-{{ ph.state }}">
+          <span class="phase-state">{% if ph.state == 'fertig' %}erledigt{% elif ph.state == 'aktiv' %}jetzt{% else %}später{% endif %}</span>
+          <b>{{ ph.n }}. {{ ph.name }}</b>
+          <span>{{ ph.text }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section class="block">
+    <h2>Tests je Auto</h2>
+    <p class="fine">Ziel je Auto: {{ p.goal1 }} Tests für Stufe 1 (Richtung der Wirkung abgesichert), {{ p.goal2 }} für Stufe 2 (Stärke der Wirkung).
+      Ein Test ist ein A-B-A im Auto oder ein Garage-Paar.</p>
+    {% if p.cars %}
+      <div class="car-grid">
+      {% for c in p.cars %}
+        <article class="car-card">
+          <header>
+            <h3>{{ c.car }}</h3>
+            <span class="stage stage-{{ c.stage.n }}">{{ c.stage.label }}</span>
+          </header>
+          <p class="car-count"><b>{{ c.tests }}</b> von {{ p.goal2 }} Tests
+            {% if c.stage.missing %}<span class="dim">· noch {{ c.stage.missing }} bis Stufe {{ c.stage.n }}</span>{% endif %}</p>
+          <div class="meter big" role="img" aria-label="{{ c.tests }} von {{ p.goal2 }} Tests, Stufe 1 bei {{ p.goal1 }}">
+            <span class="meter-fill" style="width: {{ c.pct2 }}%"></span>
+            <span class="meter-mark" style="left: {{ p.goal1 / p.goal2 * 100 }}%"></span>
+          </div>
+          <div class="meter-scale" aria-hidden="true"><span>0</span><span style="left: {{ p.goal1 / p.goal2 * 100 }}%">Stufe 1 · {{ p.goal1 }}</span><span class="end">Stufe 2 · {{ p.goal2 }}</span></div>
+          <dl class="car-facts">
+            <div><dt>Fahrer</dt><dd>{{ c.drivers }}</dd></div>
+            <div><dt>Sessions</dt><dd>{{ c.sessions }}</dd></div>
+            <div><dt>Runden</dt><dd>{{ c.laps }}</dd></div>
+            <div><dt>A-B-A / Garage</dt><dd>{{ c.aba }} / {{ c.garage }}</dd></div>
+          </dl>
+          <p class="car-tracks"><span class="dim">Strecken:</span> {{ c.tracks | join(", ") or "–" }}</p>
+          <h4>Getestete Einstellungen</h4>
+          <ul class="topics">
+            {% for name, n in c.topics %}
+              <li class="{% if not n %}open{% endif %}" title="{{ n }} Test{{ '' if n == 1 else 's' }}"><span>{{ name }}</span><b>{{ n if n else "offen" }}</b></li>
+            {% endfor %}
+          </ul>
+        </article>
+      {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty">Noch keine ausgewerteten Daten. Die ersten Uploads legen hier den Grundstein.</p>
+    {% endif %}
+  </section>
+
+  {% if p.cars %}
+  {% set lead = p.cars[0] %}
+  {% set open = lead.open_topics %}
+  <section class="block help-most">
+    <h2>So hilfst du gerade am meisten</h2>
+    <p>Beim <b>{{ lead.car }}</b> fehlen {% if lead.stage.missing %}noch {{ lead.stage.missing }} Tests bis Stufe {{ lead.stage.n }}{% else %}keine Tests mehr bis Stufe 2{% endif %}.
+      {% if open %}Noch gar nicht getestet: <b>{{ open | join(", ") }}</b>.{% endif %}
+      <a class="arrow-link" href="/leitfaden#aba">So geht ein Test</a></p>
+  </section>
+  {% endif %}
+
+  <section class="block">
+    <h2>Aktivität der letzten acht Wochen</h2>
+    <p class="fine">Uploads je Woche, darunter die Zahl der Tests.</p>
+    <ol class="weeks" aria-label="Uploads je Woche">
+      {% for w in p.weeks %}
+        <li title="Woche ab {{ w.label }}: {{ w.uploads }} Uploads, {{ w.tests }} Tests">
+          <span class="week-bar"><span style="height: {{ [w.pct, 2 if w.uploads else 0] | max }}%"></span></span>
+          <b>{{ w.uploads }}</b>
+          <small>{{ w.tests }} T.</small>
+          <span class="week-label">{{ w.label }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>
+{% endblock %}

@@ -10,7 +10,11 @@
       ob es am Setup oder an der Linie liegt – und sammeln gemeinsam, was eine Änderung tatsächlich bringt.
     </p>
     <div class="hero-actions">
-      {% if discord_ready %}
+      {% if user and user.consent_at %}
+        <a class="btn btn-primary" href="/meine-daten">Zum Upload</a>
+        <a class="btn btn-ghost" href="/projekt">Warum wir das machen</a>
+        <p class="fine">Angemeldet als {{ user.display_name or user.username }}.</p>
+      {% elif discord_ready %}
         <a class="btn btn-discord" href="/login">
           <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.2a18 18 0 0 0-5.5 0L8.7 3a19.6 19.6 0 0 0-4.9 1.5C.7 9.1-.2 13.6.3 18.1a19.8 19.8 0 0 0 6 3l1.3-2.1a12.8 12.8 0 0 1-2-1l.5-.4a14 14 0 0 0 12 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.7 19.7 0 0 0 6-3c.5-5.2-.9-9.7-3.6-13.7ZM8 15.4c-1.2 0-2.1-1-2.1-2.3S6.8 10.8 8 10.8s2.2 1 2.1 2.3c0 1.2-.9 2.3-2.1 2.3Zm8 0c-1.2 0-2.1-1-2.1-2.3s.9-2.3 2.1-2.3 2.2 1 2.1 2.3c0 1.2-.9 2.3-2.1 2.3Z"/></svg>
           Mit Discord anmelden
@@ -98,7 +102,7 @@
   </ul>
   {% if totals.sessions %}
     <p class="tally">Bisher dabei: {{ totals.drivers }} Fahrer, {{ totals.sessions }} Sessions,
-      {{ totals.laps }} gewertete Runden, {{ totals.tests }} Tests.</p>
+      {{ totals.laps }} gewertete Runden, {{ totals.tests }} Tests. <a href="/fortschritt">Wo wir stehen</a></p>
   {% endif %}
   <aside class="honest">
     <h3>Ganz ehrlich</h3>
@@ -106,6 +110,8 @@
       wie wir hoffen, weiß heute niemand. Kann sein, dass wir unterwegs merken, dass manches nicht klappt. Aber wenn es klappt,
       haben wir etwas, das es so noch nicht gibt – gebaut von uns, für uns. Das ist den Versuch wert.</p>
   </aside>
+  <p class="more-links"><a class="arrow-link" href="/projekt">Die ganze Geschichte: warum wir das machen</a>
+    <a class="arrow-link" href="/fortschritt">Wie weit wir sind</a></p>
 </section>
 
 <section class="wrap block">
@@ -146,7 +152,8 @@
     <h2>Danke</h2>
     <p>Jeder Test kostet eine halbe Stunde Fahrzeit, die du sonst in Rennen stecken würdest. Ohne euch funktioniert das nicht –
       mit euch kann daraus etwas richtig Besonderes werden.</p>
-    {% if discord_ready %}<p><a class="btn btn-discord" href="/login">Mit Discord anmelden</a></p>{% endif %}
+    {% if user and user.consent_at %}<p><a class="btn btn-primary" href="/meine-daten">Zum Upload</a></p>
+    {% elif discord_ready %}<p><a class="btn btn-discord" href="/login">Mit Discord anmelden</a></p>{% endif %}
   </div>
 </section>
 {% endblock %}

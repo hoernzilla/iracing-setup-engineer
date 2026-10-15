@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Das Projekt{% endblock %}
+{% block content %}
+<article class="wrap page story">
+  <header class="story-head">
+    <p class="kicker">Das Projekt</p>
+    <h1>Weniger raten.<br>Mehr wissen.</h1>
+    <p class="lead">Warum wir unsere Telemetrie zusammenlegen – und was jeder Einzelne davon hat, schon ab der ersten Datei.</p>
+  </header>
+
+  <section class="story-part">
+    <h2>Kennt ihr das?</h2>
+    <p>Neues Auto, neues Setup – gekauft, vom Teamkollegen oder aus dem Forum. Es fühlt sich nicht ganz richtig an.
+      Also dreht man am Stabi, fährt zwei Runden, und es fühlt sich besser an. Oder lag es daran, dass die Strecke
+      inzwischen Gummi hat? Dass die Reifen endlich warm waren? Dass man selbst einfach eingefahren war?</p>
+    <p>Am Ende weiß niemand so genau, was eigentlich geholfen hat. Und beim nächsten Auto geht das Raten von vorne los.</p>
+  </section>
+
+  <section class="story-part">
+    <h2>Der Unterschied: Wir messen</h2>
+    <p>Die Telemetrie, die iRacing mit <kbd>Alt</kbd> + <kbd>L</kbd> aufzeichnet, weiß mehr als jedes Gefühl.
+      Unsere Auswertung liest daraus in jeder einzelnen Kurve, ob das Auto schiebt oder dreht – beim Einlenken,
+      am Scheitel, am Ausgang. Sie erkennt, ob das am Setup liegt oder daran, dass zu schnell eingelenkt wurde.
+      Und sie rechnet heraus, was sich zwischen zwei Runs sonst noch geändert hat: Luftdichte, Streckentemperatur, Sprit.</p>
+    <blockquote class="pull">
+      Das Gefühl sagte: Stabi vorne härter, passt schon.<br>
+      Die Messung sagte: im mittleren Tempo deutlich mehr Untersteuern.
+      <cite>Erster echter Test, Porsche 963 in Watkins Glen</cite>
+    </blockquote>
+    <p>Genau dafür gibt es den A-B-A-Test: umstellen, fahren, <i>zurückstellen</i>, wieder fahren. Was dann übrig bleibt,
+      ist die Wirkung der Einstellung – nicht die der Strecke.</p>
+  </section>
+
+  <section class="story-part">
+    <h2>Warum es uns alle braucht</h2>
+    <p>Ein einzelner Test ist eine Momentaufnahme: ein Fahrer, eine Strecke, ein Tag. Erst viele Tests zusammen
+      zeigen, was eine Änderung bei einem Auto <b>wirklich</b> bewirkt. Für jedes Auto haben wir uns zwei Ziele gesetzt:</p>
+    <dl class="goals">
+      <div><dt>{{ goal1 }} Tests</dt><dd>Dann ist abgesichert, in welche Richtung eine Änderung wirkt.</dd></div>
+      <div><dt>{{ goal2 }} Tests</dt><dd>Dann wissen wir auch, wie viel sie bringt – und die Auswertung rechnet ab da mit unseren Messwerten statt mit Lehrbuchwissen.</dd></div>
+    </dl>
+    <p>Allein wäre das eine Aufgabe für Monate. Zusammen sieht die Rechnung anders aus:
+      <b>Wenn {{ goal1 }} von uns je einen einzigen Test fahren, ist die erste Stufe für ein Auto geschafft.</b></p>
+  </section>
+
+  <section class="story-part">
+    <h2>Was du sofort davon hast</h2>
+    <p>Niemand muss warten, bis das Projekt „fertig“ ist. Jede hochgeladene Datei wird in wenigen Sekunden ausgewertet,
+      und die Auswertung gehört dir:</p>
+    <ol class="loop" aria-label="So läuft es">
+      <li><b>Hochladen</b><span>Datei rein, egal ob normaler Run oder Test.</span></li>
+      <li><b>Auswertung</b><span>Balance pro Kurve, Plattform, Reifen, Fahrer oder Auto.</span></li>
+      <li><b>Nächster Test</b><span>Ein konkreter Vorschlag, was du als Nächstes ausprobierst.</span></li>
+      <li><b>Ergebnis</b><span>Hat es gewirkt? Nachgemessen, nicht geschätzt.</span></li>
+    </ol>
+    <p>Und jeder Test, den jemand anders fährt, macht deine nächste Empfehlung ein Stück besser. Das ist der eigentliche Trick:
+      Wir testen nicht füreinander, sondern miteinander.</p>
+  </section>
+
+  <section class="story-part">
+    <h2>Was wir dafür brauchen</h2>
+    <p>Keine Bestzeiten. Eine halbe Stunde, ein leeres Practice und die Disziplin, genau <b>eine</b> Sache zu ändern.
+      Konstant fahren, ehrlich aufschreiben, wie es sich angefühlt hat, die Originaldatei hochladen.
+      Ein sauberer Test mit zwei Sekunden Rückstand ist für uns mehr wert als ein chaotischer Run mit Bestzeit.</p>
+    <p><a class="arrow-link" href="/leitfaden">Wie ein guter Test genau aussieht</a></p>
+  </section>
+
+  <section class="story-part">
+    <h2>Was daraus werden kann</h2>
+    <p>Für jedes Auto, das wir gemeinsam testen, entsteht nach und nach eine Karte: Welche Einstellung wirkt auf welcher Art
+      Strecke in welche Richtung, und wie stark. Wer neu ins Auto steigt, startet nicht bei null, sondern mit dem, was die
+      ganze Gruppe schon herausgefunden hat. Wir fangen mit dem GTP an, die GT3 kommen danach.</p>
+    <p>So etwas gibt es für iRacing bisher nicht – nicht weil es unmöglich wäre, sondern weil es nur mit vielen Fahrern geht,
+      die sauber testen. Genau die haben wir.</p>
+  </section>
+
+  <section class="story-part">
+    <h2>Und wenn es nicht klappt?</h2>
+    <p>Dann haben wir es probiert, und zwar gründlich. Es ist ein Experiment, und manches wird sich unterwegs als Sackgasse
+      herausstellen. Aber auch „diese Änderung bringt in diesem Auto nichts“ ist ein Ergebnis, das bisher niemand gemessen hat.
+      Verloren ist kein einziger Test.</p>
+  </section>
+
+  <section class="story-end">
+    <h2>Danke, dass du dabei bist</h2>
+    {% if totals.sessions %}
+      <p>Bisher: {{ totals.drivers }} Fahrer, {{ totals.sessions }} Sessions, {{ totals.tests }} Tests.
+        <a class="arrow-link" href="/fortschritt">Wo wir gerade stehen</a></p>
+    {% else %}
+      <p>Noch ist alles offen – die ersten Dateien legen den Grundstein. <a class="arrow-link" href="/fortschritt">Fortschritt ansehen</a></p>
+    {% endif %}
+    <p class="story-cta">
+      {% if user and user.consent_at %}
+        <a class="btn btn-primary" href="/meine-daten">Zum Upload</a>
+      {% elif discord_ready %}
+        <a class="btn btn-discord" href="/login">Mit Discord anmelden und mitmachen</a>
+      {% endif %}
+    </p>
+  </section>
+</article>
+{% endblock %}

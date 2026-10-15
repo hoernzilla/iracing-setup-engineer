@@ -1,0 +1,6 @@
+<p class="kicker">Verwaltung</p>
+<nav class="tabs admin-tabs" aria-label="Verwaltung">
+  {% for key, href, label in [("uebersicht", "/admin", "Übersicht"), ("teilnehmer", "/admin/teilnehmer", "Teilnehmer"), ("uploads", "/admin/uploads", "Uploads"), ("protokoll", "/admin/protokoll", "Protokoll"), ("einstellungen", "/admin/einstellungen", "Einstellungen")] %}
+    <a href="{{ href }}" {% if section == key %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

@@ -62,6 +62,15 @@ class Worker:
             h.add(record)
             h.save()
 
+    def _counts(self, rows: list[dict]) -> bool:
+        """Fließt der Test ins gemeinsame Wissen? Nicht bei aussortierten Uploads oder gesperrten Teilnehmern."""
+        for r in rows:
+            fresh = self.db.get_upload(r["id"]) or r
+            user = self.db.get_user(fresh["user_id"])
+            if fresh.get("excluded_at") or (user and user.get("banned_at")):
+                return False
+        return True
+
     def _run(self, upload_id: str) -> None:
         row = self.db.get_upload(upload_id)
         if row is None:
@@ -95,7 +104,8 @@ class Worker:
                 ab_path.write_text(ab_text, encoding="utf-8")
                 rec = record_from_ab(r, a, None, within_session=True)
                 rec.file_a = rec.file_b = f"{row['user_id']}/{row['filename']}"
-                self._save_test(rec)
+                if self._counts([row]):
+                    self._save_test(rec)
                 fields.update(ab_report_path=str(ab_path), ab_summary=_summary(r))
             self.db.update_upload(upload_id, status=DONE, **fields)
             if row["pair_id"]:
@@ -125,7 +135,8 @@ class Worker:
             ab_path.write_text(ab_markdown(r, ma["filename"], mb["filename"]), encoding="utf-8")
             rec = record_from_ab(r, a, b)
             rec.file_a, rec.file_b = f"{ma['user_id']}/{ma['filename']}", f"{mb['user_id']}/{mb['filename']}"
-            self._save_test(rec)
+            if self._counts(members):
+                self._save_test(rec)
             summary = _summary(r)
             for m in members:
                 self.db.update_upload(m["id"], ab_report_path=str(ab_path), ab_summary=summary)

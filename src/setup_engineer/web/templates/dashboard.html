@@ -29,6 +29,9 @@
   </section>
   {% else %}
   <h1 id="upload">Telemetrie hochladen</h1>
+  {% if paused %}
+  <p class="notice">Uploads sind gerade pausiert.{% if pause_message %} {{ pause_message }}{% endif %} Deine bisherigen Auswertungen bleiben unten abrufbar.</p>
+  {% endif %}
 
   {% if next_tests %}
   <aside class="next-test">
@@ -40,6 +43,7 @@
   </aside>
   {% endif %}
 
+  {% if not paused %}
   <form id="upload-form" class="upload" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <div class="pitbox" id="dropzone">
@@ -90,6 +94,7 @@
       <a href="/leitfaden">Leitfaden</a></p>
   </form>
   {% endif %}
+  {% endif %}
 
   <section class="block">
     <h2>Deine Uploads</h2>
@@ -111,6 +116,7 @@
               <td>
                 <span class="state state-{{ u.status }}">{{ u.status }}</span>
                 {% if u.error %}<span class="state-error">{{ u.error }}</span>{% endif %}
+                {% if u.excluded_at %}<span class="state state-excluded" title="{{ u.excluded_reason or '' }}">aussortiert</span><span class="ab-line">Fließt nicht ins gemeinsame Wissen{% if u.excluded_reason %}: {{ u.excluded_reason }}{% endif %}.</span>{% endif %}
                 {% if u.ab %}<span class="ab-line">{{ u.ab.changes }}: {{ u.ab.verdict }}{% if u.ab.effect_s is not none %} ({{ "%+.3f"|format(u.ab.effect_s) }} s){% endif %}</span>{% endif %}
               </td>
               <td class="actions">

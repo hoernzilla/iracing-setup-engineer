@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ p.display_name or p.username }} – Verwaltung{% endblock %}
+{% block content %}
+{% set back = "/admin/teilnehmer/" ~ p.discord_id %}
+<div class="wrap page">
+  {% include "admin/_tabs.html" %}
+  <p class="back"><a href="/admin/teilnehmer">← Alle Teilnehmer</a></p>
+  <header class="person-head">
+    {% if p.avatar %}<img src="{{ p.avatar }}" alt="" width="64" height="64">{% endif %}
+    <div>
+      <h1>{{ p.display_name or p.username }}</h1>
+      <p class="dim">{{ p.username }} · Discord-ID {{ p.discord_id }} · dabei seit {{ p.first_login | datum }} · zuletzt {{ p.last_login | datum }}</p>
+      <p>
+        {% if p.banned %}<span class="state state-fehler">gesperrt{% if p.banned_until %} bis {{ p.banned_until | datum }}{% else %}, dauerhaft{% endif %}</span>
+        {% elif not p.consent_at %}<span class="state">Einwilligung offen</span>{% else %}<span class="state state-fertig">aktiv</span>{% endif %}
+        {% if p.owner %}<span class="state state-admin">Haupt-Admin</span>{% elif p.is_admin %}<span class="state state-admin">Admin</span>{% endif %}
+        {% if p.guide_ok %}<span class="state state-fertig">Leitfaden bestätigt</span>{% else %}<span class="state">Leitfaden offen</span>{% endif %}
+      </p>
+      {% if p.banned and p.ban_reason %}<p class="notice">Grund der Sperre: {{ p.ban_reason }}</p>{% endif %}
+    </div>
+  </header>
+
+  <dl class="kpis small">
+    <div><dt>Uploads</dt><dd>{{ p.uploads }}</dd></div>
+    <div><dt>Tests</dt><dd>{{ p.tests }}</dd></div>
+    <div><dt>Runden</dt><dd>{{ p.laps }}</dd></div>
+    <div><dt>Aussortiert</dt><dd>{{ p.excluded }}</dd></div>
+    <div><dt>Speicher</dt><dd>{{ "%.0f"|format(p.bytes / 1048576) }}<small> MB</small></dd></div>
+  </dl>
+
+  <div class="admin-cols">
+    <section class="block panel">
+      <h2>Notiz</h2>
+      <p class="fine">Nur für Admins sichtbar.</p>
+      <form method="post" action="/admin/aktion">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+        <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="notiz">
+        <textarea name="note" rows="4" maxlength="2000" placeholder="z. B. fährt nur GTP, liefert sehr saubere A-B-A-Tests">{{ p.admin_note or "" }}</textarea>
+        <button type="submit" class="btn btn-small">Notiz speichern</button>
+      </form>
+    </section>
+
+    <section class="block panel">
+      <h2>Aktionen</h2>
+      {% if self_view %}<p class="fine">Das ist dein eigenes Konto – Sperren und Entfernen sind hier gesperrt.</p>{% endif %}
+      <div class="action-list">
+        {% if not p.banned %}
+          {% if not p.owner and not self_view %}
+          <details class="action">
+            <summary>Sperren</summary>
+            <form method="post" action="/admin/aktion">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+              <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="sperren">
+              <label>Grund <input type="text" name="reason" maxlength="300" placeholder="Wird dem Teilnehmer angezeigt"></label>
+              <label>Dauer
+                <select name="days"><option value="">dauerhaft</option><option value="1">1 Tag</option><option value="7">7 Tage</option><option value="30">30 Tage</option></select>
+              </label>
+              <label class="check"><input type="checkbox" name="exclude" value="1" checked> <span>Seine Daten aus dem gemeinsamen Wissen nehmen</span></label>
+              <label class="check"><input type="checkbox" name="delete" value="1"> <span>Alle seine Dateien löschen</span></label>
+              <button type="submit" class="btn btn-small btn-danger">Sperren</button>
+              <p class="fine">Wirkt sofort: Er wird abgemeldet und kommt auch über Discord nicht mehr rein.</p>
+            </form>
+          </details>
+          {% endif %}
+        {% else %}
+          <form method="post" action="/admin/aktion" class="action-inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+            <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="entsperren">
+            <button type="submit" class="btn btn-small">Entsperren</button>
+            <span class="fine">Aussortierte Daten bleiben aussortiert, bis du sie unten wieder wertest.</span>
+          </form>
+        {% endif %}
+
+        {% if not p.owner and not self_view %}
+        <details class="action">
+          <summary>Entfernen (Konto und alle Daten löschen)</summary>
+          <form method="post" action="/admin/aktion" onsubmit="return confirm('Konto und alle Dateien dieses Teilnehmers endgültig löschen?')">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+            <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="rauswerfen">
+            <label>Grund (fürs Protokoll) <input type="text" name="reason" maxlength="300"></label>
+            <button type="submit" class="btn btn-small btn-danger">Endgültig entfernen</button>
+            <p class="fine">Er kann sich danach neu anmelden, solange er im Discord ist. Soll er draußen bleiben: stattdessen sperren.</p>
+          </form>
+        </details>
+        {% endif %}
+
+        <details class="action">
+          <summary>Daten aussortieren oder wieder werten</summary>
+          <form method="post" action="/admin/aktion">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+            <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="daten_aussortieren">
+            <label>Grund <input type="text" name="reason" maxlength="300" placeholder="z. B. Tests nicht nach Leitfaden"></label>
+            <button type="submit" class="btn btn-small">Alle Uploads aussortieren</button>
+          </form>
+          <form method="post" action="/admin/aktion">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+            <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="daten_werten">
+            <button type="submit" class="btn btn-small btn-ghost">Alle wieder werten</button>
+          </form>
+        </details>
+
+        <form method="post" action="/admin/aktion" class="action-inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+          <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="leitfaden_zuruecksetzen">
+          <button type="submit" class="btn btn-small btn-ghost">Leitfaden neu bestätigen lassen</button>
+        </form>
+
+        {% if not p.owner %}
+        <form method="post" action="/admin/aktion" class="action-inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+          <input type="hidden" name="back" value="{{ back }}">
+          {% if p.is_admin %}
+            {% if not self_view %}<input type="hidden" name="action" value="admin_nehmen"><button type="submit" class="btn btn-small btn-ghost">Admin-Rechte entziehen</button>{% endif %}
+          {% else %}
+            <input type="hidden" name="action" value="admin_geben"><button type="submit" class="btn btn-small btn-ghost">Zum Admin machen</button>
+          {% endif %}
+        </form>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <section class="block">
+    <h2>Uploads</h2>
+    {% if uploads %}
+      {% with show_user=false %}{% include "admin/_upload_table.html" %}{% endwith %}
+    {% else %}<p class="empty">Noch keine Uploads.</p>{% endif %}
+  </section>
+
+  {% if log %}
+  <section class="block">
+    <h2>Verlauf</h2>
+    <ul class="feed">
+      {% for e in log %}<li><span class="feed-when">{{ e.at | datum }}</span> <b>{{ e.admin_name }}</b>: {{ e.action }}{% if e.detail %} <span class="dim">({{ e.detail }})</span>{% endif %}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

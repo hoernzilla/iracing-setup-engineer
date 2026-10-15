@@ -76,6 +76,17 @@ HTTPS; dann `PORTAL_HTTPS_ONLY=1` setzen.
   bei jedem Hochfahren automatisch. Abschalten: `Portal-Autostart.bat entfernen` in einer
   Admin-Eingabeaufforderung.
 
+## Verwaltung
+
+Admins (aus `PORTAL_ADMIN_DISCORD_IDS` oder in der Verwaltung ernannt) sehen oben den Menüpunkt **Verwaltung**:
+- **Teilnehmer:** sperren (mit Grund, 1/7/30 Tage oder dauerhaft, optional Daten aussortieren oder löschen),
+  entsperren, entfernen (Konto und Daten löschen), zum Admin machen, Notizen, Leitfaden neu bestätigen lassen.
+- **Uploads:** aussortieren (Datei bleibt, zählt aber nicht fürs gemeinsame Wissen), wieder werten, neu auswerten, löschen.
+- **Protokoll:** jede Admin-Aktion mit Zeit und Name.
+- **Einstellungen:** Ankündigungs-Banner, Uploads pausieren, Leitfaden von allen neu bestätigen lassen, alles neu auswerten.
+
+Öffentlich sind **Das Projekt** (Motivationstext) und **Fortschritt** (Phasen, Tests je Auto, getestete Einstellungen).
+
 ## Test-Leitfaden
 
 Vor dem ersten Upload muss jeder den Leitfaden bis zum Ende durchscrollen und bestätigen; vorher

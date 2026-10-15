@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Verwaltung{% endblock %}
+{% block content %}
+<div class="wrap page">
+  {% include "admin/_tabs.html" %}
+  <h1>Übersicht</h1>
+  {% if paused %}<p class="notice">Uploads sind gerade <b>pausiert</b>. <a href="/admin/einstellungen">Ändern</a></p>{% endif %}
+
+  <dl class="kpis">
+    <div><dt>Teilnehmer</dt><dd>{{ stats.users }}<small> · {{ stats.active7 }} aktiv in 7 Tagen</small></dd></div>
+    <div><dt>Gesperrt</dt><dd>{{ stats.banned }}</dd></div>
+    <div><dt>Uploads</dt><dd>{{ stats.uploads }}<small> · {{ "%.1f"|format(stats.bytes / 1073741824) }} GB</small></dd></div>
+    <div><dt>Tests gewertet</dt><dd>{{ totals.tests }}</dd></div>
+    <div><dt>Aussortiert</dt><dd>{{ stats.excluded }}</dd></div>
+    <div><dt>In Arbeit / Fehler</dt><dd>{{ stats.queued }}<small> / {{ stats.failed }}</small></dd></div>
+  </dl>
+
+  <div class="admin-cols">
+    <section class="block">
+      <h2>Neueste Uploads</h2>
+      {% if recent %}
+      <ul class="feed">
+        {% for u in recent %}
+          <li>
+            <span class="feed-when">{{ u.uploaded_at | datum }}</span>
+            <a href="/admin/teilnehmer/{{ u.user_id }}">{{ u.display_name or u.username }}</a>:
+            {{ u.car or u.filename }}{% if u.track %}, {{ u.track }}{% endif %} · {{ test_types[u.test_type] }}
+            <span class="state state-{{ u.status }}">{{ u.status }}</span>{% if u.excluded_at %} <span class="state state-excluded">aussortiert</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      <p><a class="arrow-link" href="/admin/uploads">Alle Uploads</a></p>
+      {% else %}<p class="empty">Noch keine Uploads.</p>{% endif %}
+    </section>
+    <section class="block">
+      <h2>Zuletzt in der Verwaltung</h2>
+      {% if log %}
+      <ul class="feed">
+        {% for e in log %}
+          <li><span class="feed-when">{{ e.at | datum }}</span> <b>{{ e.admin_name }}</b>: {{ e.action }}{% if e.target_name %} – {{ e.target_name }}{% endif %}{% if e.detail %} <span class="dim">({{ e.detail }})</span>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      <p><a class="arrow-link" href="/admin/protokoll">Ganzes Protokoll</a></p>
+      {% else %}<p class="empty">Noch keine Einträge.</p>{% endif %}
+    </section>
+  </div>
+
+  {% if failed %}
+  <section class="block">
+    <h2>Fehlgeschlagene Auswertungen</h2>
+    {% with uploads=failed, show_user=true, back="/admin" %}{% include "admin/_upload_table.html" %}{% endwith %}
+  </section>
+  {% endif %}
+
+  <section class="block">
+    <h2>Datenlage je Auto</h2>
+    {% if coverage %}
+    <div class="table-scroll">
+      <table class="timing">
+        <thead><tr><th>Auto</th><th class="num">Fahrer</th><th class="num">Strecken</th><th class="num">Sessions</th><th class="num">Runden</th><th class="num">Tests</th><th>Stufe 1 ({{ goal1 }})</th><th>Stufe 2 ({{ goal2 }})</th></tr></thead>
+        <tbody>
+        {% for c in coverage %}
+          <tr>
+            <td>{{ c.car }}</td><td class="num">{{ c.drivers }}</td><td class="num">{{ c.tracks }}</td><td class="num">{{ c.sessions }}</td>
+            <td class="num">{{ c.laps }}</td><td class="num">{{ c.tests }}</td>
+            <td><div class="meter small"><span class="meter-fill" style="width: {{ [c.tests / goal1 * 100, 100] | min }}%"></span></div></td>
+            <td><div class="meter small"><span class="meter-fill" style="width: {{ [c.tests / goal2 * 100, 100] | min }}%"></span></div></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p><a class="arrow-link" href="/fortschritt">Öffentliche Fortschrittsseite</a></p>
+    {% else %}<p class="empty">Noch keine ausgewerteten Daten.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

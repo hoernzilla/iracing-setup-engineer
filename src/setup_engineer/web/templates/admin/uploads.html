@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Uploads – Verwaltung{% endblock %}
+{% block content %}
+{% set back = request.url.path ~ ("?" ~ request.url.query if request.url.query else "") %}
+<div class="wrap page">
+  {% include "admin/_tabs.html" %}
+  <h1>Uploads</h1>
+  <form class="filters" method="get" action="/admin/uploads">
+    <label><span>Suche</span><input type="search" name="q" value="{{ f.q }}" placeholder="Fahrer, Datei, Strecke, Notiz"></label>
+    <label><span>Auto</span>
+      <select name="car"><option value="">alle</option>{% for c in cars %}<option {% if f.car == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select>
+    </label>
+    <label><span>Stand</span>
+      <select name="status"><option value="">alle</option>{% for st in statuses %}<option {% if f.status == st %}selected{% endif %}>{{ st }}</option>{% endfor %}</select>
+    </label>
+    <label><span>Gewertet</span>
+      <select name="excluded">
+        {% for v, l in [("", "alle"), ("nein", "gewertet"), ("ja", "aussortiert")] %}<option value="{{ v }}" {% if f.excluded == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn-small">Filtern</button>
+  </form>
+  {% if uploads %}
+    {% with show_user=true %}{% include "admin/_upload_table.html" %}{% endwith %}
+    <p class="fine">{{ uploads | length }} Uploads{% if uploads | length >= 500 %} (die neuesten 500){% endif %}. „Aussortieren“ behält die Datei, nimmt sie aber aus dem gemeinsamen Wissen und der Statistik.</p>
+  {% else %}<p class="empty">Keine Uploads gefunden.</p>{% endif %}
+</div>
+{% endblock %}

@@ -17,19 +17,28 @@
         <span>Setup-Engineer</span>
       </a>
       <nav class="topnav" aria-label="Hauptmenü">
-        <a href="/leitfaden" {% if request.url.path == '/leitfaden' %}aria-current="page"{% endif %}>Leitfaden</a>
+        {% set path = request.url.path %}
+        <a href="/" {% if path == '/' %}aria-current="page"{% endif %}>Start</a>
+        <a href="/projekt" {% if path == '/projekt' %}aria-current="page"{% endif %}>Das Projekt</a>
+        <a href="/fortschritt" {% if path == '/fortschritt' %}aria-current="page"{% endif %}>Fortschritt</a>
+        <a href="/leitfaden" {% if path == '/leitfaden' %}aria-current="page"{% endif %}>Leitfaden</a>
         {% if user and user.consent_at %}
-          <a href="/meine-daten" {% if request.url.path == '/meine-daten' %}aria-current="page"{% endif %}>Meine Daten</a>
-          {% if admin %}<a href="/admin" {% if request.url.path == '/admin' %}aria-current="page"{% endif %}>Übersicht</a>{% endif %}
+          <a href="/meine-daten" class="nav-strong" {% if path == '/meine-daten' %}aria-current="page"{% endif %}>Meine Daten</a>
+          {% if admin %}<a href="/admin" class="nav-admin" {% if path.startswith('/admin') %}aria-current="page"{% endif %}>Verwaltung</a>{% endif %}
           <span class="me">
             {% if user.avatar %}<img src="{{ user.avatar }}" alt="" width="28" height="28">{% endif %}
             {{ user.display_name or user.username }}
           </span>
           <a href="/logout">Abmelden</a>
+        {% elif not user %}
+          <a href="/login" class="nav-strong">Anmelden</a>
         {% endif %}
       </nav>
     </div>
   </header>
+  {% if announcement %}
+  <div class="announce" role="status"><div class="wrap">{{ announcement }}</div></div>
+  {% endif %}
   <main id="inhalt">
     {% block content %}{% endblock %}
   </main>
