@@ -67,8 +67,18 @@ def cmd_compare(args: argparse.Namespace) -> int:
         out_name = f"ab_{Path(args.a).stem}.md"
     else:
         b = analyze_file(args.b)
+        # Windows legt beim Drag & Drop die Reihenfolge nicht fest -> nach Aufnahmezeit sortieren:
+        # die ältere Aufnahme ist A (vorher), die neuere B (nachher).
+        def started(x) -> tuple:
+            t = x.ibt.get("SessionTime")
+            return (x.ibt.disk.session_start_date, float(t[0]) if len(t) else 0.0)
+
+        if started(b) < started(a):
+            a, b = b, a
+        print(f"A (vorher):  {a.ibt.path.name}  ({a.ibt.start_date:%d.%m.%Y %H:%M} UTC)")
+        print(f"B (nachher): {b.ibt.path.name}  ({b.ibt.start_date:%d.%m.%Y %H:%M} UTC)")
         r = ab_compare(a, b)
-        name_a, name_b = Path(args.a).name, Path(args.b).name
+        name_a, name_b = a.ibt.path.name, b.ibt.path.name
         out_name = "ab_vergleich.md"
     _write(args.out, out_name, ab_markdown(r, name_a, name_b))
     if args.save:

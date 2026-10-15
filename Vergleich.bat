@@ -1,7 +1,7 @@
 @echo off
 rem iRacing Setup-Engineer - A/B-Vergleich
 rem Benutzung:
-rem   - ZWEI .ibt-Dateien (erst A = vorher, dann B = nachher) auf diese Datei ziehen
+rem   - ZWEI .ibt-Dateien gleichzeitig auf diese Datei ziehen (Reihenfolge egal - die aeltere Aufnahme ist A)
 rem   - oder EINE .ibt-Datei, wenn du waehrend der Session im Auto umgestellt hast (A-B-A)
 rem Ergebnis: Bericht im Ordner "Berichte" neben der ersten Datei; der Test wird in der
 rem Test-Historie gespeichert und fliesst in kuenftige Empfehlungen ein.

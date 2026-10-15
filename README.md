@@ -3,6 +3,8 @@
 Privates Projekt: ein lokaler „Race Engineer“ für iRacing, der aus der eigenen Telemetrie
 ein besseres Setup ableitet – mit Fokus auf **GT3** und **GTP**.
 
+**Bedienung unter Windows: siehe [ANLEITUNG.md](ANLEITUNG.md).**
+
 Konzept & Marktanalyse: https://claude.ai/code/artifact/ef2f48ff-029a-4ca5-bd09-af62bce56a8c
 
 ## Kernidee
