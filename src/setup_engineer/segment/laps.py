@@ -40,6 +40,14 @@ class LapSet:
     laps: list[Lap]
     grid: np.ndarray  # LapDistPct-Raster
 
+    _cache: dict[str, np.ndarray] = field(default_factory=dict, repr=False)
+
+    def _cache_1d(self, name: str) -> np.ndarray:
+        """Kanäle nur einmal aus der (großen) Datei lesen."""
+        if name not in self._cache:
+            self._cache[name] = self.ibt.get(name)
+        return self._cache[name]
+
     @property
     def valid(self) -> list[Lap]:
         return [lap for lap in self.laps if lap.valid]
@@ -51,10 +59,8 @@ class LapSet:
 
     def resample(self, lap: Lap, name: str) -> np.ndarray:
         """Kanal einer Runde auf das Distanzraster interpolieren."""
-        pct = _monotonic_pct(self.ibt.channel("LapDistPct")[lap.slice])
-        values = self.ibt.get(name)[lap.slice]
-        if values.ndim != 1:
-            raise ValueError(f"{name} ist ein Array-Kanal; bitte Basiskanal verwenden")
+        pct = _monotonic_pct(self._cache_1d("LapDistPct")[lap.slice])
+        values = self._cache_1d(name)[lap.slice]
         ok = np.isfinite(values)
         if ok.sum() < 2:
             return np.full_like(self.grid, np.nan)

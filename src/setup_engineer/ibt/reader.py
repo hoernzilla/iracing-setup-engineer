@@ -177,10 +177,18 @@ class IbtFile:
         return arr.reshape(-1) if arr.ndim == 2 else arr
 
     def get(self, name: str, default: float = np.nan) -> np.ndarray:
-        """Kanal oder Array voller `default`, falls er fehlt."""
+        """Kanal als 1D-Array (60 Hz) oder Array voller `default`, falls er fehlt.
+
+        Hochaufgelöste Kanäle (in echten IBT-Dateien z. B. YawRate, LatAccel,
+        *shockVel mit 6 Werten pro Datensatz) werden pro Datensatz gemittelt.
+        """
         if self.has(name):
-            return self.channel(name)
+            arr = self.channel(name)
+            return arr.mean(axis=1) if arr.ndim == 2 else arr
         return np.full(self.record_count, default, dtype=np.float64)
+
+    def is_hi_res(self, name: str) -> bool:
+        return self.has(name) and self.var_headers[name].count > 1
 
     def channel_names(self) -> list[str]:
         return list(self.var_headers)

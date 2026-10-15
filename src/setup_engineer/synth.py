@@ -181,12 +181,15 @@ def generate(cfg: SynthConfig = SynthConfig()) -> tuple[dict[str, np.ndarray], s
             rh = base - aero * (0.045 if front else 0.05) + rng.normal(0, 0.0008, n_t)
             push(f"{w}rideHeight", rh.astype(np.float32))
             defl = 0.004 + aero * 0.009 + np.abs(lat) * 0.0004 + rng.normal(0, 0.0005, n_t)
-            push(f"{w}shockDefl", defl.astype(np.float32))
             vel = np.gradient(defl, 1 / TICK)
-            push(f"{w}shockVel", vel.astype(np.float32))
             if cfg.hi_res:
+                # Wie in echten IBT-Dateien: 6 Werte (360 Hz) pro Datensatz unter dem normalen Namen
+                push(f"{w}shockDefl", (np.repeat(defl[:, None], 6, axis=1)).astype(np.float32))
                 hi = np.repeat(vel[:, None], 6, axis=1) + rng.normal(0, 0.02, (n_t, 6))
-                push(f"{w}shockVel_ST", hi.astype(np.float32))
+                push(f"{w}shockVel", hi.astype(np.float32))
+            else:
+                push(f"{w}shockDefl", defl.astype(np.float32))
+                push(f"{w}shockVel", vel.astype(np.float32))
         fuel -= lap_time * 0.03
         t_total += n_t / TICK
         lap_times.append(lap_time)

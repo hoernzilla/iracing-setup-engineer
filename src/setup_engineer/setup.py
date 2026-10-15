@@ -46,7 +46,12 @@ class SetupValue:
 
     @property
     def likely_read_only(self) -> bool:
-        return any(h in self.key for h in READ_ONLY_HINTS)
+        if any(h in self.key for h in READ_ONLY_HINTS):
+            return True
+        if "AeroCalculator" in self.path:  # GTP: Rechner-Eingaben, keine Fahrzeugeinstellung
+            return True
+        # Anzeigen der Form "statisch max" (z. B. "35.5 mm 94.0 mm")
+        return bool(re.match(r"^\s*[-+]?\d+(\.\d+)?\s*mm\s+[-+]?\d+(\.\d+)?\s*mm\s*$", self.raw))
 
 
 def parse_value(path: str, raw: Any) -> SetupValue:

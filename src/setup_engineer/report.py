@@ -41,6 +41,12 @@ def session_markdown(a: SessionAnalysis) -> str:
     L.append(f"- Kanäle: {a.inventory.total}, davon {len(a.inventory.hi_res)} hochauflösend")
     L.append("")
 
+    findings = a.findings()
+    if findings:
+        L.append("## Wichtigste Befunde\n")
+        L += [f"{i}. {f}" for i, f in enumerate(findings, 1)]
+        L.append("")
+
     if a.notes:
         L.append("## Hinweise\n")
         L += [f"- {n}" for n in a.notes]
@@ -71,9 +77,21 @@ def session_markdown(a: SessionAnalysis) -> str:
             )
         L.append("\nPositionen als Anteil der Runde (LapDistPct).\n")
 
+    # Balance nach Tempo
+    sb = a.speed_balance
+    if sb:
+        L.append("## Balance nach Tempo (mechanisch vs. Aero)\n")
+        L.append("| Tempo | Messpunkte | Querbeschl. (g) | Lenküberschuss |")
+        L.append("| --- | --- | --- | --- |")
+        for b in sb.bands:
+            L.append(f"| {b.band} | {b.samples} | {b.lat_g:.2f} | {b.understeer * 100:+.1f} % |")
+        L.append("")
+        if sb.finding:
+            L.append(f"**{sb.finding}**\n")
+
     # Balance
     if a.balance:
-        L.append("## Balance (Unter-/Übersteuern)\n")
+        L.append("## Balance pro Kurve (Unter-/Übersteuern)\n")
         if a.steer_model:
             L.append(f"Lenkmodell aus {a.steer_model.samples} Messpunkten im linearen Bereich gelernt.\n")
         L.append("| Kurve | Phase | Lenküberschuss | Streuung | Gegenlenken | Tendenz | Ursache | r(Eingangstempo) |")
@@ -91,14 +109,51 @@ def session_markdown(a: SessionAnalysis) -> str:
     # Plattform
     p = a.platform
     if p:
-        if p.ride_height:
-            L.append("## Plattform / Ride Height\n")
-            L.append("| Zone | vorne (mm) | hinten (mm) | Rake (mm) | Minimum (mm) | Runden mit Aufsetzer |")
-            L.append("| --- | --- | --- | --- | --- | --- |")
-            for r in p.ride_height:
+        if p.aero:
+            ae = p.aero
+            L.append("## Aero-Plattform bei Topspeed\n")
+            L.append(f"Gemessen bei ca. {ae.speed_kmh:.0f} km/h auf den Geraden.\n")
+            L.append("| | Aero-Rechner | gemessen | Abweichung |")
+            L.append("| --- | --- | --- | --- |")
+            L.append(f"| Ride Height vorne (mm) | {ae.front_calc_mm:.1f} | {ae.front_meas_mm:.1f} | {ae.front_meas_mm - ae.front_calc_mm:+.1f} |")
+            L.append(f"| Ride Height hinten (mm) | {ae.rear_calc_mm:.1f} | {ae.rear_meas_mm:.1f} | {ae.rear_meas_mm - ae.rear_calc_mm:+.1f} |")
+            rk_c, rk_m = ae.rear_calc_mm - ae.front_calc_mm, ae.rear_meas_mm - ae.front_meas_mm
+            L.append(f"| Rake (mm) | {rk_c:.1f} | {rk_m:.1f} | {rk_m - rk_c:+.1f} |")
+            L.append("")
+            if ae.finding:
+                L.append(f"{ae.finding}\n")
+        if p.contacts:
+            L.append("## Bodenkontakt (Ride Height ≤ 0 mm)\n")
+            L.append("| Ort | Position | Art | Räder | Runden | Tempo (km/h) | tiefster Wert (mm) |")
+            L.append("| --- | --- | --- | --- | --- | --- | --- |")
+            for c in p.contacts:
                 L.append(
-                    f"| {r.zone} | {_f(r.front_mm)} | {_f(r.rear_mm)} | {_f(r.rake_mm)} | {_f(r.min_mm)} | {r.bottoming_laps} |"
+                    f"| {c.location} | {c.pct:.3f} | {c.kind} | {', '.join(c.wheels)} | {c.laps}/{c.of_laps} | "
+                    f"{c.speed_kmh:.0f} | {c.lowest_mm:.1f} |"
                 )
+            L.append(
+                "\nArt (vorläufige Heuristik): unter −8 mm = Kerb hebt die Fahrbahn unter dem Messpunkt an; "
+                "knapp unter 0 = Auto setzt auf.\n"
+            )
+        if p.travel:
+            L.append("## Federweg-Ausnutzung\n")
+            L.append("| Setup-Anzeige | Kanal | statisch (mm) | max. genutzt (mm) | max. möglich (mm) | Ausnutzung | Reserve (mm) |")
+            L.append("| --- | --- | --- | --- | --- | --- | --- |")
+            for t in p.travel:
+                mark = "" if t.matched_static else " ¹"
+                L.append(
+                    f"| {t.setting} | `{t.channel}`{mark} | {t.static_mm:.1f} | {t.used_mm:.1f} | {t.max_mm:.1f} | "
+                    f"{t.usage * 100:.0f} % | {t.margin_mm:.1f} |"
+                )
+            if any(not t.matched_static for t in p.travel):
+                L.append("\n¹ Standwert passt nicht zur Setup-Anzeige – Zuordnung prüfen.")
+            L.append("\nMax. genutzt = 99,9-%-Perzentil im Fahrbetrieb (einzelne Kerb-Spitzen ausgenommen).\n")
+        if p.ride_height:
+            L.append("## Ride Height pro Zone\n")
+            L.append("| Zone | vorne (mm) | hinten (mm) | Rake (mm) | tiefster Punkt, 1 % (mm) |")
+            L.append("| --- | --- | --- | --- | --- |")
+            for r in p.ride_height:
+                L.append(f"| {r.zone} | {_f(r.front_mm)} | {_f(r.rear_mm)} | {_f(r.rake_mm)} | {_f(r.low_mm)} |")
             L.append("")
         if p.bump_stops:
             L.append("## Bump Stops\n")
@@ -120,6 +175,38 @@ def session_markdown(a: SessionAnalysis) -> str:
         if p.notes:
             L += [f"- {n}" for n in p.notes]
             L.append("")
+
+    # Reifen
+    t = a.tires
+    if t and t.laps:
+        L.append("## Reifen (live: Druck und Oberflächentemperatur)\n")
+        wheels = [w for w in ("LF", "RF", "LR", "RR") if w in t.laps[0].pressure_kpa]
+        L.append("| Runde | " + " | ".join(f"{w} kPa" for w in wheels) + " | " + " | ".join(f"{w} °C" for w in wheels) + " |")
+        L.append("| --- " * (1 + 2 * len(wheels)) + "|")
+        for row in t.laps:
+            L.append(
+                f"| {row.lap} | "
+                + " | ".join(_f(row.pressure_kpa.get(w), 1) for w in wheels)
+                + " | "
+                + " | ".join(_f(row.surface_c.get(w), 0) for w in wheels)
+                + " |"
+            )
+        if t.cold_kpa:
+            L.append("\nKaltdruck laut Garage: " + ", ".join(f"{w} {v:.0f} kPa" for w, v in t.cold_kpa.items()))
+        if t.stable_from_lap is not None:
+            L.append(f"\nDrücke stabil (< 1 kPa Änderung pro Runde) ab Runde {t.stable_from_lap}.")
+        else:
+            L.append("\nDrücke steigen bis zum Ende noch an – Stint zu kurz, um den Zieldruck zu beurteilen.")
+        L.append("")
+
+    # Schlupf
+    if a.slip:
+        L.append("## Traktion und Blockieren (aus Radgeschwindigkeiten)\n")
+        L.append("| Kurve | Durchdrehen im Ausgang | Blockieren beim Bremsen | Räder |")
+        L.append("| --- | --- | --- | --- |")
+        for r in a.slip:
+            L.append(f"| {r.corner} | {_pct(r.spin_exit)} | {_pct(r.lock_brake)} | {r.lock_wheels or '–'} |")
+        L.append("\nDurchdrehen: Hinterrad > 5 % schneller als frei rollend. Blockieren: Rad > 10 % langsamer. Schwellen vorläufig.\n")
 
     # Fahrstil
     s = a.style

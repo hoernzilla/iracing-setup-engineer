@@ -165,6 +165,78 @@ def _verdict(med: float, spread: float, worst: float, corr: float | None, n: int
     return "unklar"
 
 
+SPEED_BANDS_KMH = ((0, 150), (150, 200), (200, 250), (250, 500))
+AERO_SPLIT_FLAG = 0.10  # 10 Prozentpunkte Unterschied langsam vs. schnell
+
+
+@dataclass(frozen=True)
+class SpeedBandBalance:
+    band: str
+    samples: int
+    lat_g: float
+    understeer: float
+
+
+@dataclass(frozen=True)
+class SpeedBalance:
+    bands: list[SpeedBandBalance]
+    low: float | None  # Mittel der langsamen Bänder
+    high: float | None  # Mittel der schnellen Bänder
+    finding: str | None
+
+
+def balance_by_speed(laps: LapSet, model: SteerModel) -> SpeedBalance | None:
+    """Balance im Grenzbereich nach Tempo getrennt.
+
+    Unterscheidet mechanische Balance (langsam) von Aero-Balance (schnell):
+    Untersteuert das Auto nur schnell, liegt die Aero-Balance zu weit hinten
+    (oder die Plattform verschiebt sie bei Tempo); übersteuert es schnell,
+    entsprechend umgekehrt.
+    """
+    if not laps.valid:
+        return None
+    steer = laps.stack("SteeringWheelAngle")
+    speed = laps.stack("Speed")
+    kappa = _kappa(laps, speed)
+    ay = laps.stack("LatAccel") if laps.ibt.has("LatAccel") else kappa * speed**2
+    brake = laps.stack("Brake") if laps.ibt.has("Brake") else np.zeros_like(speed)
+    neutral = model.gain * kappa
+    grip = (np.abs(ay) > 0.6 * np.nanpercentile(np.abs(ay), 95)) & (brake < 0.05)
+    grip &= np.sign(steer) == np.sign(neutral)
+    kmh = speed * 3.6
+    bands = []
+    for lo, hi in SPEED_BANDS_KMH:
+        m = grip & (kmh >= lo) & (kmh < hi)
+        if m.sum() < 30:
+            continue
+        with np.errstate(invalid="ignore", divide="ignore"):
+            ex = steer[m] / neutral[m] - 1.0
+        label = f"> {lo} km/h" if hi >= 500 else f"{lo}–{hi} km/h"
+        bands.append(
+            SpeedBandBalance(label, int(m.sum()), float(np.median(np.abs(ay[m]))) / 9.81, float(np.nanmedian(ex)))
+        )
+    if not bands:
+        return None
+    low = [b.understeer for b in bands if b.band.startswith(("0", "150"))]
+    high = [b.understeer for b in bands if not b.band.startswith(("0", "150"))]
+    lo_v = float(np.mean(low)) if low else None
+    hi_v = float(np.mean(high)) if high else None
+    finding = None
+    if lo_v is not None and hi_v is not None:
+        d = hi_v - lo_v
+        if d > AERO_SPLIT_FLAG:
+            finding = (
+                f"Highspeed-Untersteuern: schnell {hi_v * 100:+.0f} % gegenüber langsam {lo_v * 100:+.0f} %. "
+                "Die Aero-Balance liegt bei Tempo zu weit hinten (Frontflügel/Rake/Ride Height vorne prüfen)."
+            )
+        elif d < -AERO_SPLIT_FLAG:
+            finding = (
+                f"Highspeed-Übersteuern: schnell {hi_v * 100:+.0f} % gegenüber langsam {lo_v * 100:+.0f} %. "
+                "Die Aero-Balance liegt bei Tempo zu weit vorne (Heckflügel/Rake prüfen)."
+            )
+    return SpeedBalance(bands=bands, low=lo_v, high=hi_v, finding=finding)
+
+
 def _nanmedian(a: np.ndarray) -> float:
     a = a[np.isfinite(a)]
     return float(np.median(a)) if a.size else float("nan")

@@ -42,8 +42,10 @@ class TestReader(SynthCase):
         ibt = IbtFile.open(self.file)
         self.assertEqual(ibt.tick_rate, 60)
         self.assertTrue(ibt.has("Speed"))
-        self.assertEqual(ibt.channel("LFshockVel_ST").shape[1], 6)
-        self.assertEqual(ibt.channel_hi_res("LFshockVel_ST").size, ibt.record_count * 6)
+        self.assertEqual(ibt.channel("LFshockVel").shape[1], 6)
+        self.assertTrue(ibt.is_hi_res("LFshockVel"))
+        self.assertEqual(ibt.channel_hi_res("LFshockVel").size, ibt.record_count * 6)
+        self.assertEqual(ibt.get("LFshockVel").shape, (ibt.record_count,))
 
     def test_session_info_with_tricky_name(self) -> None:
         ibt = IbtFile.open(self.file)
@@ -126,7 +128,7 @@ class TestDiagnosis(SynthCase):
         assert p is not None
         self.assertTrue(p.ride_height)
         self.assertEqual({d.wheel for d in p.dampers}, {"LF", "RF", "LR", "RR"})
-        self.assertTrue(all(d.source.endswith("_ST") for d in p.dampers))
+        self.assertEqual(p.dampers[0].source, "LFshockVel")
         front = {r.wheel: r for r in p.bump_stops}
         self.assertGreater(front["LF"].contact_share, 0)
         self.assertEqual(front["LR"].contact_share, 0)
@@ -153,6 +155,38 @@ class TestAB(unittest.TestCase):
         self.assertEqual(r_fast.verdict, "B ist schneller")
         self.assertLess(r_fast.effect_s, -0.2)
         self.assertTrue(np.isfinite(r_fast.p_value))
+
+
+REAL_GTP = Path(__file__).resolve().parents[1] / "data" / "gtp1.ibt"
+
+
+@unittest.skipUnless(REAL_GTP.exists(), "echte GTP-Datei (data/gtp1.ibt) nicht vorhanden")
+class TestRealGTP(unittest.TestCase):
+    """Regressionstest mit echter Porsche-963-Session (Watkins Glen, 15.10.2026)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.a = analyze_file(REAL_GTP)
+
+    def test_basics(self) -> None:
+        self.assertEqual(self.a.ibt.car_name, "Porsche 963 GTP")
+        self.assertEqual(len(self.a.laps.valid), 8)
+        self.assertAlmostEqual(self.a.laps.best.time_s, 91.993, places=2)
+        self.assertGreaterEqual(len(self.a.corners), 11)
+
+    def test_travel_matches_setup_display(self) -> None:
+        rows = {t.channel: t for t in self.a.platform.travel}
+        self.assertTrue(rows["LRshockDefl"].matched_static)
+        self.assertTrue(rows["HFshockDefl"].matched_static)
+
+    def test_high_speed_understeer(self) -> None:
+        sb = self.a.speed_balance
+        self.assertIsNotNone(sb.finding)
+        self.assertGreater(sb.high - sb.low, 0.10)
+
+    def test_pit_only_tire_channels(self) -> None:
+        self.assertIn("LFtempCM", self.a.tires.pit_only)
+        self.assertNotIn("LFtempL", self.a.tires.pit_only)
 
 
 if __name__ == "__main__":
