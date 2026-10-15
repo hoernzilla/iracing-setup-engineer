@@ -2,7 +2,43 @@
 {% block title %}Meine Daten{% endblock %}
 {% block content %}
 <div class="wrap page">
-  <h1>Telemetrie hochladen</h1>
+  {% if not guidelines_ok %}
+  <section class="gate" id="leitfaden">
+    <h1>Erst der Leitfaden, dann der Upload</h1>
+    <p class="lead">
+      {% if guidelines_renewed %}Der Leitfaden wurde überarbeitet. Bitte lies ihn noch einmal und bestätige ihn.
+      {% else %}Damit eure Daten etwas wert sind, lies bitte einmal, wie wir uns die Tests vorstellen. Danach ist der Upload frei.{% endif %}
+    </p>
+    <div class="gate-scroll" id="gate-scroll" tabindex="0" aria-label="Test-Leitfaden">
+      {% include "_leitfaden.html" %}
+      <p class="gate-end" id="gate-end">Ende des Leitfadens.</p>
+    </div>
+    <form method="post" action="/leitfaden/bestaetigen" class="consent-form" id="gate-form">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="check">
+        <input type="checkbox" name="gelesen" value="ja" id="gate-check" required>
+        <span>Ich habe den Leitfaden gelesen. Ich lade nach Möglichkeit nur Telemetrie hoch, die ihm entspricht –
+          saubere Runs, eine Änderung pro Test, Originaldateien.</span>
+      </label>
+      <p class="fine" id="gate-hint">Scroll den Leitfaden bis zum Ende, dann lässt sich das Häkchen setzen.</p>
+      {% if request.query_params.get("leitfaden") == "fehlt" %}<p class="form-msg error">Bitte das Häkchen setzen, um fortzufahren.</p>{% endif %}
+      <div class="submit-row">
+        <button type="submit" class="btn btn-primary">Bestätigen und loslegen</button>
+      </div>
+    </form>
+  </section>
+  {% else %}
+  <h1 id="upload">Telemetrie hochladen</h1>
+
+  {% if next_tests %}
+  <aside class="next-test">
+    <h2>Dein nächster Test</h2>
+    <ul class="plain">
+      {% for n in next_tests %}<li><b>{{ n.car }}, {{ n.track }}:</b> {{ n.next_test }}</li>{% endfor %}
+    </ul>
+    <p class="fine">Vorschlag aus deiner letzten Auswertung. Ablauf: <a href="/leitfaden#aba">A-B-A im Auto</a> oder <a href="/leitfaden#garage">Garage-Test</a>.</p>
+  </aside>
+  {% endif %}
 
   <form id="upload-form" class="upload" novalidate>
     <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -23,11 +59,11 @@
       </label>
       <label class="choice">
         <input type="radio" name="test_type" value="aba">
-        <span><b>A-B-A-Test im Auto</b> Eine Einstellung im Auto umgestellt und wieder zurück. Eine Datei.</span>
+        <span><b>A-B-A-Test im Auto</b> Eine Einstellung im Auto umgestellt und wieder zurück, je 5 Runden. Eine Datei.</span>
       </label>
       <label class="choice">
         <input type="radio" name="test_type" value="garage">
-        <span><b>Garage-Test</b> Eine Sache in der Garage geändert. Zwei Dateien: vorher und nachher.</span>
+        <span><b>Garage-Test</b> Genau eine Sache in der Garage geändert, je 6 Runden. Zwei Dateien: vorher und nachher.</span>
       </label>
     </fieldset>
 
@@ -50,7 +86,10 @@
       </div>
     </div>
     <p class="form-msg" id="form-msg" role="status" aria-live="polite"></p>
+    <p class="reminder">Kurz vor dem Hochladen: eine Änderung pro Test, nichts anderes im Auto verstellt, Originaldatei.
+      <a href="/leitfaden">Leitfaden</a></p>
   </form>
+  {% endif %}
 
   <section class="block">
     <h2>Deine Uploads</h2>
@@ -119,4 +158,4 @@
   </section>
 </div>
 {% endblock %}
-{% block scripts %}<script src="/static/upload.js?v={{ version }}" defer></script>{% endblock %}
+{% block scripts %}<script src="/static/upload.js?v={{ version }}" defer></script><script src="/static/gate.js?v={{ version }}" defer></script>{% endblock %}

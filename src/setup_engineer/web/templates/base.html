@@ -17,6 +17,7 @@
         <span>Setup-Engineer</span>
       </a>
       <nav class="topnav" aria-label="Hauptmenü">
+        <a href="/leitfaden" {% if request.url.path == '/leitfaden' %}aria-current="page"{% endif %}>Leitfaden</a>
         {% if user and user.consent_at %}
           <a href="/meine-daten" {% if request.url.path == '/meine-daten' %}aria-current="page"{% endif %}>Meine Daten</a>
           {% if admin %}<a href="/admin" {% if request.url.path == '/admin' %}aria-current="page"{% endif %}>Übersicht</a>{% endif %}

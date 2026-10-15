@@ -182,7 +182,13 @@ class TestPortal(unittest.TestCase):
             status, headers, _ = b.form("/einwilligung", {"csrf": csrf_from(html), "zustimmung": "ja"})
             self.assertEqual(headers["location"], "/meine-daten")
         _, _, html = b.req("/meine-daten")
-        return b, csrf_from(html)
+        csrf = csrf_from(html)
+        if "Erst der Leitfaden" in html:
+            status, headers, _ = b.form("/leitfaden/bestaetigen", {"csrf": csrf, "gelesen": "ja"})
+            self.assertEqual(status, 303)
+            _, _, html = b.req("/meine-daten")
+            self.assertIn("Telemetrie hochladen", html)
+        return b, csrf
 
     def wait_done(self, b: Browser, ids: list[str], timeout: float = 60) -> dict:
         t0 = time.time()
@@ -228,6 +234,24 @@ class TestPortal(unittest.TestCase):
             status, _, html2 = b.form("/einwilligung", {"csrf": csrf_from(html)})
             self.assertIn("Häkchen", html2)
 
+    def test_045_guidelines_gate(self) -> None:
+        # frisches Mitglied (eigene ID über eigenen Token geht hier nicht) -> Gate direkt prüfen
+        b = Browser(self.base)
+        b.login("member")
+        _, _, html = b.req("/einwilligung")
+        if 'name="zustimmung"' in html:
+            b.form("/einwilligung", {"csrf": csrf_from(html), "zustimmung": "ja"})
+        _, _, html = b.req("/meine-daten")
+        if "Erst der Leitfaden" in html:
+            csrf = csrf_from(html)
+            self.assertIn("Das bitte auf keinen Fall", html)
+            status, body = b.upload([("x.ibt", self.run_a)], {"test_type": "normal"}, csrf)
+            self.assertEqual(status, 403)
+            self.assertIn("Leitfaden", body["error"])
+            status, headers, _ = b.form("/leitfaden/bestaetigen", {"csrf": csrf})  # ohne Häkchen
+            self.assertIn("leitfaden=fehlt", headers["location"])
+        self.assertEqual(Browser(self.base).req("/leitfaden")[0], 200)
+
     def test_05_upload_aba_and_reports(self) -> None:
         b, csrf = self.member()
         status, body = b.upload([("963_test.ibt", self.aba)], {"test_type": "aba", "description": "Stabi vorne 1 auf 3"}, csrf)
@@ -243,6 +267,7 @@ class TestPortal(unittest.TestCase):
         self.assertIn("Stabilisator vorne", html)
         _, _, dash = b.req("/meine-daten")
         self.assertIn("Synth GT3", dash)
+        self.assertIn("Dein nächster Test", dash)
         hist = json.loads(self.settings.history_path.read_text(encoding="utf-8"))
         self.assertTrue(any(r["within_session"] for r in hist))
         # Duplikat

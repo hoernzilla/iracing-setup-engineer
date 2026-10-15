@@ -31,7 +31,7 @@
     {% if people %}
     <div class="table-scroll">
       <table class="timing">
-        <thead><tr><th>Name</th><th>Discord</th><th class="num">Uploads</th><th class="num">Runden</th><th class="num">Tests</th><th>Letzter Upload</th><th>Erster Login</th><th>Einwilligung</th></tr></thead>
+        <thead><tr><th>Name</th><th>Discord</th><th class="num">Uploads</th><th class="num">Runden</th><th class="num">Tests</th><th>Letzter Upload</th><th>Erster Login</th><th>Einwilligung</th><th>Leitfaden</th></tr></thead>
         <tbody>
         {% for p in people %}
           <tr>
@@ -39,6 +39,8 @@
             <td class="num">{{ p.uploads }}</td><td class="num">{{ p.laps }}</td><td class="num">{{ p.tests }}</td>
             <td>{{ p.last_upload | datum }}</td><td>{{ p.first_login | datum }}</td>
             <td>{% if p.consent_at %}<span class="state state-fertig">ja</span>{% else %}<span class="state">offen</span>{% endif %}</td>
+            <td>{% if p.guidelines_version == guidelines_version %}<span class="state state-fertig">bestätigt</span> <span class="dim">{{ p.guidelines_at | datum }}</span>
+              {% elif p.guidelines_version %}<span class="state">alte Fassung</span>{% else %}<span class="state">offen</span>{% endif %}</td>
           </tr>
         {% endfor %}
         </tbody>

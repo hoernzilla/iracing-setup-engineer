@@ -61,6 +61,20 @@ class Database:
         self._lock = threading.Lock()
         with self._conn() as c:
             c.executescript(SCHEMA)
+            self._migrate(c)
+
+    @staticmethod
+    def _migrate(c: sqlite3.Connection) -> None:
+        """Spalten nachrüsten, die nach der ersten Version dazugekommen sind."""
+        wanted = {
+            "users": {"guidelines_version": "TEXT", "guidelines_at": "TEXT"},
+            "uploads": {"next_test": "TEXT"},
+        }
+        for table, cols in wanted.items():
+            have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+            for col, typ in cols.items():
+                if col not in have:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -96,6 +110,12 @@ class Database:
     def set_consent(self, discord_id: str) -> None:
         with self._conn() as c:
             c.execute("UPDATE users SET consent_at=? WHERE discord_id=?", (now(), discord_id))
+
+    def set_guidelines(self, discord_id: str, version: str) -> None:
+        with self._conn() as c:
+            c.execute(
+                "UPDATE users SET guidelines_version=?, guidelines_at=? WHERE discord_id=?", (version, now(), discord_id)
+            )
 
     def users_with_stats(self) -> list[dict[str, Any]]:
         with self._conn() as c:
@@ -148,6 +168,17 @@ class Database:
     def pair_members(self, pair_id: str) -> list[dict[str, Any]]:
         with self._conn() as c:
             rows = c.execute("SELECT * FROM uploads WHERE pair_id=?", (pair_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def next_tests(self, user_id: str) -> list[dict[str, Any]]:
+        """Neuester Testvorschlag je Auto und Strecke."""
+        with self._conn() as c:
+            rows = c.execute(
+                """SELECT car, track, next_test, MAX(COALESCE(session_start, uploaded_at)) AS seen
+                   FROM uploads WHERE user_id=? AND status='fertig' AND next_test IS NOT NULL
+                   GROUP BY car, track ORDER BY seen DESC LIMIT 3""",
+                (user_id,),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def delete_upload(self, upload_id: str) -> None:

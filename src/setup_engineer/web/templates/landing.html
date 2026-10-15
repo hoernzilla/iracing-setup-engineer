@@ -57,36 +57,82 @@
 </section>
 
 <section class="wrap block">
-  <h2>So läuft es ab</h2>
+  <div class="narrow-left">
+    <h2>Keins der bestehenden Tools macht das, was wir wollen</h2>
+    <p>Wir haben uns angeschaut, was es für iRacing gibt: Coach Dave Delta, Track Titan und Hymo, VRS, Garage 61,
+      Grid &amp; Go, onRails und Neuralic. Alle machen ihren Job – aber im Kern gleich:</p>
+  </div>
+  <dl class="approaches">
+    <div><dt>Setup-Shops</dt><dd>verkaufen dir ein Profi-Setup und hoffen, dass es zu dir passt.</dd></div>
+    <div><dt>Automatische Setup-Tuner</dt><dd>gibt es bisher nur für LMU und ACC, nicht für iRacing.</dd></div>
+    <div><dt>Fragebogen-Tools</dt><dd>fragen dich, wie sich das Auto <i>anfühlt</i>, und rechnen damit weiter.</dd></div>
+    <div><dt>Telemetrie-Tools</dt><dd>zeigen dir saubere Kurven – was du am Setup ändern sollst, musst du selbst herausfinden.</dd></div>
+  </dl>
+  <p class="fine">Stand Oktober 2026.</p>
+</section>
+
+<section class="wrap block">
+  <h2>Genau da setzen wir an</h2>
+  <p class="narrow-left">Die Auswertung liest <b>deine</b> Telemetrie und findet heraus:</p>
+  <dl class="findings">
+    <div><dt>Wo</dt><dd>das Auto ein Problem hat – welche Kurve, welche Phase: Einlenken, Scheitel oder Ausgang.</dd></div>
+    <div><dt>Warum</dt><dd>Liegt es am Setup, oder überfährst du die Kurve? Die Auswertung kann das unterscheiden.</dd></div>
+    <div><dt>Was</dt><dd>du ändern solltest – mit konkretem Wert und Begründung.</dd></div>
+    <div><dt>Ob es geholfen hat</dt><dd>Beim nächsten Run wird nachgemessen, Luftdichte und Streckentemperatur eingerechnet.</dd></div>
+  </dl>
+  <p class="narrow-left example">Die erste Version läuft. Mit dem Porsche 963 in Watkins Glen – die Runde oben – hat sie herausgefunden,
+    warum er in den schnellen Kurven schiebt: Das Auto liegt bei Topspeed tiefer, als der Aero-Rechner im Setup annimmt.
+    Und als der Front-Stabi testweise härter gestellt wurde, hat die Auswertung <i>gemessen</i>, dass genau das die Sache verschlimmert.</p>
+</section>
+
+<section class="wrap block together">
+  <h2>Mit uns allen lernt es die Autos kennen</h2>
+  <p class="narrow-left">Mit einem einzelnen Fahrer lernt die Auswertung nur diesen einen kennen. Stellt euch vor, wir sind dreißig,
+    die GT3 und GTP fahren, und jeder testet ab und zu eine Kleinigkeit: Stabi eine Stufe härter, Flügel eine Stufe flacher,
+    Bremsbalance einen Tick nach vorne. Jeder Test wird gemessen und gespeichert. Nach ein paar Wochen wissen wir nicht nur,
+    <i>dass</i> so eine Änderung etwas bewirkt, sondern <b>wie viel, in welchem Auto, auf welcher Art Strecke</b> – aus unseren eigenen Runs.</p>
+  <ul class="benefits">
+    <li><b>Für dich gemacht.</b> Die Empfehlungen kennen deinen Fahrstil: wie du bremst, wie konstant du bist, wo du das Auto drehen lässt.</li>
+    <li><b>Niemand startet bei null.</b> Wer neu dazukommt, bekommt das Wissen der ganzen Gruppe mit.</li>
+    <li><b>Testen mit System.</b> Statt wild herumzuprobieren schlägt die Auswertung deinen nächsten Test vor – und wertet ihn danach aus.</li>
+  </ul>
+  {% if totals.sessions %}
+    <p class="tally">Bisher dabei: {{ totals.drivers }} Fahrer, {{ totals.sessions }} Sessions,
+      {{ totals.laps }} gewertete Runden, {{ totals.tests }} Tests.</p>
+  {% endif %}
+  <aside class="honest">
+    <h3>Ganz ehrlich</h3>
+    <p>Das ist ein Experiment. Es ist ein neuer Weg, mit diesen Daten umzugehen, und ob er am Ende so gut funktioniert,
+      wie wir hoffen, weiß heute niemand. Kann sein, dass wir unterwegs merken, dass manches nicht klappt. Aber wenn es klappt,
+      haben wir etwas, das es so noch nicht gibt – gebaut von uns, für uns. Das ist den Versuch wert.</p>
+  </aside>
+</section>
+
+<section class="wrap block">
+  <h2>So machst du mit</h2>
   <ol class="steps">
     <li>
       <h3>Anmelden</h3>
       <p>Mit deinem Discord-Konto. Wer Mitglied bei {{ community }} ist, ist sofort drin.</p>
     </li>
     <li>
-      <h3>Datei hochladen</h3>
-      <p>In iRacing mit <kbd>Alt</kbd> + <kbd>L</kbd> aufzeichnen. Die <code>.ibt</code>-Dateien liegen unter
-        <code>Dokumente\iRacing\telemetry</code>. Einfach ins Upload-Feld ziehen.</p>
+      <h3>Leitfaden lesen</h3>
+      <p>Wie ein guter Test aussieht und was die Daten wertlos macht. Vor dem ersten Upload bestätigst du ihn einmal.
+        <a href="/leitfaden">Leitfaden ansehen</a></p>
+    </li>
+    <li>
+      <h3>Fahren und hochladen</h3>
+      <p>Mit <kbd>Alt</kbd> + <kbd>L</kbd> aufzeichnen, die <code>.ibt</code>-Datei aus
+        <code>Dokumente\iRacing\telemetry</code> ins Upload-Feld ziehen.</p>
     </li>
     <li>
       <h3>Auswertung lesen</h3>
-      <p>Nach wenigen Sekunden: Balance pro Kurve, Plattform, Reifen und Setup-Empfehlungen.
-        Hast du im Auto umgestellt, vergleichen wir die Runden davor und danach.</p>
+      <p>Nach wenigen Sekunden: Balance pro Kurve, Plattform, Reifen, Empfehlungen – und dein nächster Test.</p>
     </li>
   </ol>
 </section>
 
 <section class="wrap block split">
-  <div>
-    <h2>Warum gemeinsam?</h2>
-    <p>Ein einzelner Test sagt wenig. Wenn viele von uns dieselbe Änderung ausprobieren, sehen wir,
-      was sie in diesem Auto wirklich bewirkt – gemessen, nicht geschätzt. Das ist ein Experiment:
-      Ob der Ansatz so gut funktioniert wie erhofft, finden wir zusammen heraus.</p>
-    {% if totals.sessions %}
-      <p class="tally">Bisher dabei: {{ totals.drivers }} Fahrer, {{ totals.sessions }} Sessions,
-        {{ totals.laps }} gewertete Runden, {{ totals.tests }} Tests.</p>
-    {% endif %}
-  </div>
   <div>
     <h2>Was mit deinen Daten passiert</h2>
     <ul class="plain">
@@ -94,6 +140,13 @@
       <li>Ins gemeinsame Wissen fließt nur, was eine Änderung bewirkt hat – nicht, wer wie schnell war.</li>
       <li>Du kannst jede Datei jederzeit wieder löschen.</li>
     </ul>
+    <p><a href="/datenschutz">Datenschutz im Detail</a></p>
+  </div>
+  <div>
+    <h2>Danke</h2>
+    <p>Jeder Test kostet eine halbe Stunde Fahrzeit, die du sonst in Rennen stecken würdest. Ohne euch funktioniert das nicht –
+      mit euch kann daraus etwas richtig Besonderes werden.</p>
+    {% if discord_ready %}<p><a class="btn btn-discord" href="/login">Mit Discord anmelden</a></p>{% endif %}
   </div>
 </section>
 {% endblock %}

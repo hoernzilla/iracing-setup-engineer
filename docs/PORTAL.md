@@ -86,6 +86,14 @@ Das Portal selbst lauscht weiter nur auf `127.0.0.1:8420`, ist also nur über Ca
   `sc create Caddy binPath= "C:\Caddy\caddy.exe run --config C:\Caddy\Caddyfile" start= auto`
   und `sc start Caddy`.
 
+## Test-Leitfaden
+
+Vor dem ersten Upload muss jeder den Leitfaden bis zum Ende durchscrollen und bestätigen; vorher
+lehnt der Server Uploads ab. Der Text steht in `src/setup_engineer/web/templates/_leitfaden.html`.
+Wird er inhaltlich geändert, in `web/app.py` das Datum in `GUIDELINES_VERSION` hochsetzen –
+dann muss jeder ihn beim nächsten Besuch erneut bestätigen. Wer wann bestätigt hat, steht in der
+Admin-Übersicht bzw. in `portal.sqlite3` (Spalten `guidelines_version`, `guidelines_at`).
+
 ## Wo die Daten liegen
 
 Alles im Ordner `portal-data` neben dem Programm (oder dem in `PORTAL_DATA_DIR` angegebenen Ordner):

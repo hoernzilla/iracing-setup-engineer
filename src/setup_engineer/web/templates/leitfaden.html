@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Test-Leitfaden{% endblock %}
+{% block content %}
+<div class="wrap page narrow">
+  <h1>Test-Leitfaden</h1>
+  <p class="lead">So werden eure Runs für das Projekt richtig wertvoll.</p>
+  <nav class="toc" aria-label="Inhalt">
+    <a href="#vorbereitung">Vorbereitung</a>
+    <a href="#aba">A-B-A im Auto</a>
+    <a href="#garage">Garage-Test</a>
+    <a href="#grunddaten">Grunddaten</a>
+    <a href="#wichtig">Darauf kommt es an</a>
+    <a href="#nicht">Bitte nicht</a>
+  </nav>
+  {% include "_leitfaden.html" %}
+  <p class="guide-cta">
+    {% if user and user.consent_at %}
+      <a class="btn btn-primary" href="/meine-daten">Zum Upload</a>
+    {% else %}
+      <a class="btn btn-discord" href="/login">Mit Discord anmelden und mitmachen</a>
+    {% endif %}
+  </p>
+</div>
+{% endblock %}

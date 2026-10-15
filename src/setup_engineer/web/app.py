@@ -38,6 +38,8 @@ TEST_TYPES = {
     "aba": "A-B-A-Test im Auto",
     "garage": "Garage-Test (zwei Runs)",
 }
+# Bei inhaltlichen Änderungen am Leitfaden erhöhen -> alle bestätigen neu
+GUIDELINES_VERSION = "2026-10-15"
 # Ziele aus der Datenplanung: Stufe 1 ≈ 30 Tests, Stufe 2 ≈ 70 Tests je Auto
 GOAL_STAGE1, GOAL_STAGE2 = 30, 70
 
@@ -136,6 +138,9 @@ def create_app(settings: Settings | None = None) -> Starlette:
     def message(request: Request, title: str, text: str, status_code: int = 200, action: tuple[str, str] | None = None) -> Response:
         return render(request, "message.html", status_code=status_code, title=title, text=text, action=action)
 
+    def guidelines_ok(user: dict | None) -> bool:
+        return bool(user and user.get("guidelines_version") == GUIDELINES_VERSION)
+
     def require_user(request: Request) -> dict | Response:
         user = current_user(request)
         if user is None:
@@ -232,7 +237,32 @@ def create_app(settings: Settings | None = None) -> Starlette:
         uploads = db.uploads_for_user(user["discord_id"])
         for u in uploads:
             u["ab"] = json.loads(u["ab_summary"]) if u["ab_summary"] else None
-        return render(request, "dashboard.html", uploads=uploads, coverage=db.coverage(), goal1=GOAL_STAGE1, goal2=GOAL_STAGE2)
+        return render(
+            request,
+            "dashboard.html",
+            uploads=uploads,
+            coverage=db.coverage(),
+            goal1=GOAL_STAGE1,
+            goal2=GOAL_STAGE2,
+            guidelines_ok=guidelines_ok(user),
+            guidelines_renewed=bool(user.get("guidelines_version")) and not guidelines_ok(user),
+            next_tests=db.next_tests(user["discord_id"]),
+        )
+
+    async def guidelines(request: Request) -> Response:
+        return render(request, "leitfaden.html")
+
+    async def guidelines_confirm(request: Request) -> Response:
+        user = require_user(request)
+        if isinstance(user, Response):
+            return user
+        form = await request.form()
+        if not csrf_ok(request, form.get("csrf")):
+            return message(request, "Sitzung abgelaufen", "Bitte die Seite neu laden.", 400)
+        if form.get("gelesen") != "ja":
+            return RedirectResponse("/meine-daten?leitfaden=fehlt#leitfaden", status_code=303)
+        db.set_guidelines(user["discord_id"], GUIDELINES_VERSION)
+        return RedirectResponse("/meine-daten#upload", status_code=303)
 
     async def report(request: Request) -> Response:
         user = require_user(request)
@@ -271,6 +301,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             request,
             "admin.html",
             people=db.users_with_stats(),
+            guidelines_version=GUIDELINES_VERSION,
             coverage=db.coverage(),
             totals=db.totals(),
             goal1=GOAL_STAGE1,
@@ -298,6 +329,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
             return await reject(request, "Du bist nicht mehr angemeldet – bitte die Seite neu laden und anmelden.", 401)
         if not csrf_ok(request, request.headers.get("x-csrf-token")):
             return await reject(request, "Sitzung abgelaufen – bitte die Seite neu laden.", 400)
+        if not guidelines_ok(user):
+            return await reject(request, "Bitte zuerst den Test-Leitfaden lesen und bestätigen.", 403)
         limit = s.max_upload_mb * 1024 * 1024
         declared = int(request.headers.get("content-length") or 0)
         if declared > limit * s.max_files_per_upload + 1024 * 1024:
@@ -409,6 +442,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
         Route("/upload/{upload_id}/loeschen", delete_upload, methods=["POST"]),
         Route("/admin", admin),
         Route("/datenschutz", privacy),
+        Route("/leitfaden", guidelines),
+        Route("/leitfaden/bestaetigen", guidelines_confirm, methods=["POST"]),
         Route("/api/upload", api_upload, methods=["POST"]),
         Route("/api/status", api_status),
         Route("/health", health),

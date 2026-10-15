@@ -84,6 +84,7 @@ class Worker:
                 best_lap_s=best.time_s if best else None,
                 report_path=str(report_path),
                 analysis_version=__version__,
+                next_test=_next_test(rs),
             )
             # A-B-A innerhalb der Session (im Auto umgestellt)
             within = ab_within(a) if row["test_type"] != "garage" else None
@@ -132,6 +133,16 @@ class Worker:
             log.error("Vergleich %s fehlgeschlagen:\n%s", pair_id, traceback.format_exc())
             for m in members:
                 self.db.update_upload(m["id"], error=f"Vergleich fehlgeschlagen ({type(e).__name__}: {e})")
+
+
+def _next_test(rs) -> str | None:
+    """Die oberste Empfehlung als konkreter nächster Test."""
+    if not rs.recommendations:
+        return None
+    r = rs.recommendations[0]
+    how = "im Auto als A-B-A in einer Session" if r.incar else "als Garage-Test mit zwei Runs"
+    title = f"{r.parameter.replace(' (im Auto)', '')} zurück auf {r.proposed}" if r.revert_of else r.candidate.title
+    return f"{title}: {r.parameter.replace(' (im Auto)', '')} {r.current} → {r.proposed}, {how}."
 
 
 def _summary(r) -> str:
