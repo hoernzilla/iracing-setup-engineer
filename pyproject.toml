@@ -1,0 +1,19 @@
+[project]
+name = "setup-engineer"
+version = "0.1.0"
+description = "iRacing Setup-Engineer: Setup-Empfehlungen aus eigener Telemetrie (GT3/GTP)"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

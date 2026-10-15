@@ -1,0 +1,17 @@
+# Telemetrie & Setups (privat, groß)
+data/
+*.ibt
+*.sto
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
