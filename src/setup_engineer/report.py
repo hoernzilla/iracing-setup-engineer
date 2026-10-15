@@ -65,6 +65,34 @@ def session_markdown(a: SessionAnalysis) -> str:
         )
     L.append("")
 
+    # Im Auto verstellt
+    from .incar import changed_settings, lap_groups
+
+    changed = changed_settings(a.incar)
+    if changed:
+        L.append("## Im Auto verstellt\n")
+        L.append("Das Setup in der Datei ist der Garage-Stand. Gefahren wurde mit diesen Werten:\n")
+        L.append("| Einstellung | Garage-Setup | in der Session gesehen | gefahren in den gewerteten Runden |")
+        L.append("| --- | --- | --- | --- |")
+        for s in changed:
+            driven = ", ".join(f"{v:g}" for v in sorted(set(s.per_lap.values())))
+            L.append(
+                f"| {s.label} (`{s.channel}`) | {a.garage_value(s) or '–'} | "
+                f"{', '.join(f'{v:g}' for v in s.session_values)} | {driven or '–'} |"
+            )
+        L.append("")
+        groups = lap_groups(a.incar)
+        if len(groups) > 1:
+            by_no = {lap.number: lap for lap in a.laps.valid}
+            L.append("### Rundengruppen nach Einstellung (gleiche Session = vergleichbare Bedingungen)\n")
+            L.append("| Einstellung | Runden | Ø Zeit | Bestzeit |")
+            L.append("| --- | --- | --- | --- |")
+            for key, nums in groups.items():
+                times = [by_no[n].time_s for n in nums]
+                desc = ", ".join(f"{lbl} {v:g}" for lbl, v in key)
+                L.append(f"| {desc} | {', '.join(map(str, nums))} | {_fmt_time(sum(times) / len(times))} | {_fmt_time(min(times))} |")
+            L.append("")
+
     # Kurven
     if a.corners:
         L.append("## Erkannte Kurven\n")
@@ -267,6 +295,12 @@ def ab_markdown(r: ABResult, name_a: str, name_b: str) -> str:
         L.append("| --- | --- | --- | --- |")
         for c in r.conditions:
             L.append(f"| {c.name} ({c.unit}) | {c.a:.4g} | {c.b:.4g} | {'⚠ verschieden' if c.warn else ''} |")
+    if r.balance:
+        L.append("\n## Balance A vs. B (Lenküberschuss, + = Untersteuern)\n")
+        L.append("| Bereich | A | B | Veränderung |")
+        L.append("| --- | --- | --- | --- |")
+        for x in r.balance:
+            L.append(f"| {x.zone} | {x.a * 100:+.0f} % | {x.b * 100:+.0f} % | {(x.b - x.a) * 100:+.0f} Pkt. |")
     if r.sections:
         L.append("\n## Wo liegt die Zeit? (Median je Abschnitt)\n")
         L.append("| Abschnitt | A (s) | B (s) | B − A (s) |")

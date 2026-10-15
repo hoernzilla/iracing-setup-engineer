@@ -23,6 +23,14 @@ from .diagnose import (
     fit_steer_model,
 )
 from .ibt import IbtFile
+from .incar import LABELS, InCarSetting, changed_settings, in_car_settings
+
+
+def _num(raw: str) -> float | None:
+    import re
+
+    m = re.match(r"^\s*([-+]?\d+(?:\.\d+)?)", raw)
+    return float(m.group(1)) if m else None
 from .segment import Corner, LapSet, detect_corners, split_laps
 from .setup import CarSetup
 
@@ -41,7 +49,18 @@ class SessionAnalysis:
     tires: TireResult | None
     slip: list[SlipRow]
     style: StyleProfile | None
+    incar: list[InCarSetting] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+
+    def garage_value(self, s: InCarSetting) -> str | None:
+        """Garage-Wert aus dem Setup, der zu einer Verstellung im Auto passt."""
+        frags = LABELS.get(s.channel, ("", ()))[1]
+        if not frags:
+            return None
+        hits = [v for v in self.setup.find(*frags) if not v.likely_read_only]
+        numeric = [v for v in hits if v.value is not None]  # "ArbAdj 1" statt "ArbSetting Connected"
+        hits = numeric or hits
+        return hits[0].raw if hits else None
 
     @property
     def path(self) -> Path:
@@ -50,6 +69,19 @@ class SessionAnalysis:
     def findings(self) -> list[str]:
         """Die wichtigsten Auffälligkeiten in Klartext, nach Bedeutung sortiert."""
         out: list[str] = []
+        for s in changed_settings(self.incar):
+            garage = self.garage_value(s)
+            if s.constant_in_valid_laps and s.effective is not None:
+                if garage is not None and _num(garage) != s.effective:
+                    out.append(
+                        f"Im Auto verstellt: {s.label} gefahren mit {s.effective:g} (Garage-Setup: {garage}) – "
+                        "das Setup in der Datei zeigt nur den Garage-Stand."
+                    )
+            elif not s.constant_in_valid_laps:
+                out.append(
+                    f"{s.label} wurde während der gewerteten Runden verstellt "
+                    f"({', '.join(f'{v:g}' for v in sorted(set(s.per_lap.values())))}) – siehe Rundengruppen."
+                )
         if self.speed_balance and self.speed_balance.finding:
             out.append(self.speed_balance.finding)
         p = self.platform
@@ -130,5 +162,6 @@ def analyze_file(path: str | Path) -> SessionAnalysis:
         tires=tires,
         slip=analyze_slip(laps, corners),
         style=analyze_style(laps, corners),
+        incar=in_car_settings(laps) if laps.valid else [],
         notes=notes,
     )

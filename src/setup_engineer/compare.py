@@ -36,6 +36,7 @@ class ABResult:
     lap_sd_s: float | None = None  # Rundenstreuung nach Bereinigung (Fahrer-Konstanz)
     sections: list["SectionDelta"] = field(default_factory=list)
     conditions: list["Condition"] = field(default_factory=list)
+    balance: list["BalanceDelta"] = field(default_factory=list)
 
 
 @dataclass
@@ -110,6 +111,43 @@ def compare_conditions(a: SessionAnalysis, b: SessionAnalysis) -> list[Condition
     return out
 
 
+def incar_changes(a: SessionAnalysis, b: SessionAnalysis) -> list[SetupChange]:
+    """Unterschiede der im Auto gefahrenen Werte (dc*-Kanäle), die im Setup-Block fehlen."""
+    eb = {s.channel: s for s in b.incar}
+    out = []
+    for sa in a.incar:
+        sb = eb.get(sa.channel)
+        if sb is None or sa.effective is None or sb.effective is None or sa.effective == sb.effective:
+            continue
+        out.append(
+            SetupChange(f"Im Auto: {sa.label}", f"{sa.effective:g}", f"{sb.effective:g}", round(sb.effective - sa.effective, 4), "")
+        )
+    return out
+
+
+@dataclass
+class BalanceDelta:
+    zone: str
+    a: float
+    b: float
+
+
+def balance_deltas(a: SessionAnalysis, b: SessionAnalysis) -> list[BalanceDelta]:
+    """Lenküberschuss A vs. B – nach Tempo und je Kurve (Scheitel), um die Wirkung
+    einer Änderung auf die Balance zu sehen."""
+    out = []
+    if a.speed_balance and b.speed_balance:
+        bb = {x.band: x for x in b.speed_balance.bands}
+        for x in a.speed_balance.bands:
+            if x.band in bb:
+                out.append(BalanceDelta(f"Tempo {x.band}", x.understeer, bb[x.band].understeer))
+    pb = {(x.corner, x.phase): x for x in b.balance}
+    for x in a.balance:
+        if x.phase == "Scheitel" and (x.corner, x.phase) in pb:
+            out.append(BalanceDelta(f"{x.corner} Scheitel", x.understeer, pb[(x.corner, x.phase)].understeer))
+    return out
+
+
 def _racing_laps(s: SessionAnalysis, notes: list[str], label: str) -> list:
     """Gültige Runden ohne Aufwärmrunde (erste fliegende Runde nach der Boxengasse).
 
@@ -153,7 +191,7 @@ def _usable_covariate(x: np.ndarray, group: np.ndarray, min_sd: float) -> tuple[
 def ab_compare(a: SessionAnalysis, b: SessionAnalysis) -> ABResult:
     notes: list[str] = []
     la, lb = _racing_laps(a, notes, "A"), _racing_laps(b, notes, "B")
-    changes = diff(a.setup, b.setup)
+    changes = diff(a.setup, b.setup) + incar_changes(a, b)
     if not changes:
         notes.append(
             "Keine Setup-Änderung zwischen A und B – der Unterschied stammt aus Fahrer und Bedingungen "
@@ -235,4 +273,5 @@ def ab_compare(a: SessionAnalysis, b: SessionAnalysis) -> ABResult:
         lap_sd_s=sd,
         sections=section_deltas(a, b),
         conditions=conds,
+        balance=balance_deltas(a, b),
     )

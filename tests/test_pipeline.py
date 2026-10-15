@@ -202,7 +202,11 @@ class TestRealGTPRepeat(unittest.TestCase):
         self.assertNotIn("Streckentemperatur", r.covariates)
         self.assertGreater(r.effect_s, 0)  # B war im Schnitt langsamer
         self.assertLess(abs(r.effect_s - (r.mean_b - r.mean_a)), 0.3)
-        self.assertEqual(r.setup_changes, [])
+        # Garage-Setup identisch, aber Front-Stabi im Auto von 1 auf 3 verstellt
+        self.assertEqual(
+            [(c.path, c.before, c.after) for c in r.setup_changes],
+            [("Im Auto: Stabilisator vorne", "1", "3")],
+        )
         self.assertTrue(any(c.name == "Luftdichte" and c.warn for c in r.conditions))
         self.assertAlmostEqual(sum(s.delta for s in r.sections), r.mean_b - r.mean_a, delta=0.4)
 

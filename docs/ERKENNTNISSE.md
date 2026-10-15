@@ -35,11 +35,23 @@
 - Passend dazu: Ride Height bei ~300 km/h vorne −2,8 mm, hinten −6,0 mm gegenüber dem Aero-Rechner
   (Rake 21,8 statt 25,0 mm).
 
-### Wiederholbarkeit (zweiter Run, 03:13 Uhr, identisches Setup)
-- Run B im Schnitt **0,8 s langsamer** (p < 0,001), ohne jede Setup-Änderung.
-- Ursache sehr wahrscheinlich die Bedingungen: **Luftdichte −4,6 %** (1,188 → 1,133 kg/m³),
-  Strecke +1 °C. Passend dazu: Vmax −2,7 km/h, Kurventempos niedriger, Verlust gleichmäßig
-  über alle Abschnitte verteilt (kein einzelner Fahrfehler).
+### Verstellungen im Auto
+- Der CarSetup-Block der IBT-Datei ist der **Garage-Stand**. Im Auto verstellte Werte stehen nur in den
+  `dc*`-Kanälen (z. B. `dcAntiRollFront`, `dcBrakeBias`). Run 2: Garage `Front.ArbAdj 1`, im Auto in der
+  Outlap auf 3 gestellt. Bremsbalance in beiden Runs in der Outlap von 48,25 auf 47,25 % gestellt.
+- Wird innerhalb der gewerteten Runden verstellt, teilt die Analyse die Runden nach Einstellung auf
+  (gleiche Session = vergleichbare Bedingungen).
+
+### Run 2 (03:13 Uhr): Front-Stabi 1 → 3 (im Auto)
+- Run B im Schnitt **0,8 s langsamer** (p < 0,001).
+- Balance-Fingerabdruck des härteren Front-Stabis: mehr Untersteuern im mittleren Tempobereich
+  (150–200 km/h +7 Pkt.; T11 +15, T3 +8, T12 +8 Pkt.), kaum Änderung > 250 km/h (+1 Pkt.).
+  Passt zur Lehrbuchwirkung (mehr Wanksteifigkeit vorne → mehr Untersteuern).
+- Gleichzeitig andere Bedingungen: **Luftdichte −4,6 %** (1,188 → 1,133 kg/m³), Strecke +1 °C.
+  Passend dazu: Vmax −2,7 km/h (Stabi beeinflusst Vmax nicht → das ist die Luftdichte).
+- Fazit: Der Zeitverlust ist eine Mischung aus Stabi und Bedingungen und lässt sich mit getrennten
+  Runs nicht sauber aufteilen. Die Balance-Verschiebung im mittleren Tempo ist dagegen klar dem Stabi
+  zuzuordnen, denn die Luftdichte wirkt vor allem im schnellen Bereich, und dort änderte sich kaum etwas.
 - Folgen für die Methode:
   - Getrennte Runs sind nur bei gleichen Bedingungen vergleichbar → Bedingungen werden jetzt
     im A/B-Bericht gezeigt und gewarnt.
