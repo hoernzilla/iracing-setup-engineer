@@ -101,11 +101,10 @@ def build(db, history_path: Path, goal1: int, goal2: int) -> dict:
     # ------------------------------------------------------------ Gesamtphase
     best = max((c["tests"] for c in car_list), default=0)
     phases = [
-        ("Werkzeug", "Auswertung, A/B-Vergleich und Empfehlungen laufen – getestet mit dem Porsche 963.", True),
+        ("Werkzeug", "Auswertung, A/B-Vergleich und Empfehlungen laufen – für GT3 und GTP.", True),
         ("Stufe 1: Richtungen", f"{goal1} Tests je Auto. Dann ist abgesichert, in welche Richtung eine Änderung bei diesem Auto wirkt.", best >= goal1),
         ("Stufe 2: Stärke", f"{goal2} Tests je Auto. Dann wissen wir auch, wie viel eine Änderung bringt.", best >= goal2),
         ("Lernende Auswertung", "Die Empfehlungen rechnen pro Auto mit den gemessenen Wirkungen statt mit Lehrbuchwerten.", False),
-        ("GT3", "Bewusst zurückgestellt – kommt dazu, wenn der GTP steht.", False),
     ]
     current = next((i for i, p in enumerate(phases) if not p[2]), len(phases) - 1)
     phase_list = [

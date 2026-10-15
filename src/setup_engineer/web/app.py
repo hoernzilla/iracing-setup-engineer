@@ -196,7 +196,17 @@ def create_app(settings: Settings | None = None) -> Starlette:
 
     # ----------------------------------------------------------- Seiten
     async def landing(request: Request) -> Response:
-        return render(request, "landing.html", hero=hero, totals=db.totals(), discord_ready=s.discord_configured)
+        user = current_user(request)
+        data = await asyncio.to_thread(progress.build, db, s.history_path, GOAL_STAGE1, GOAL_STAGE2)
+        return render(
+            request,
+            "landing.html",
+            hero=hero,
+            p=data,
+            phase=next((ph for ph in data["phases"] if ph["state"] == "aktiv"), data["phases"][-1]),
+            next_tests=db.next_tests(user["discord_id"]) if user and user.get("consent_at") else [],
+            discord_ready=s.discord_configured,
+        )
 
     async def project(request: Request) -> Response:
         return render(

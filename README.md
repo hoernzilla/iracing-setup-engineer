@@ -34,7 +34,7 @@ Kalibrierung an echten GT3-/GTP-Daten steht noch aus.
 | A/B-Vergleich mit Sprit-/Temperaturbereinigung und Signifikanztest | fertig |
 | Verstellungen im Auto (dc*-Kanäle), A-B-A-Vergleich innerhalb einer Session | fertig |
 | A/B-Bericht mit Fazit, Bedingungen, Zeit je Abschnitt, Kurventempo, Plattform, Reifen | fertig |
-| Empfehlungs-Engine: Symptome → bewertete Setup-Änderungen mit Testplan | fertig (GTP), GT3 offen |
+| Empfehlungs-Engine: Symptome → bewertete Setup-Änderungen mit Testplan | fertig (GTP), GT3 aktiv, Kalibrierung mit Community-Daten |
 | Test-Historie: gemessene Wirkung fließt in Empfehlungen ein | fertig |
 | Community-Portal: Discord-Login nur für Server-Mitglieder, Pflicht-Leitfaden, Upload, Auswertung mit nächstem Test, Admin-Übersicht | fertig, lokal getestet |
 | Live-Telemetrie (Shared Memory, Windows) | Grundgerüst, ungetestet |

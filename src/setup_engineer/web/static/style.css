@@ -507,3 +507,12 @@ ul.plain.bad li::marker { color: var(--bremse); content: "✕  "; }
   .hero-actions .btn + .btn { margin: .6rem 0 0; }
   .menu-body { right: auto; left: 0; width: min(19rem, 80vw); }
 }
+
+/* ------------------------------------------------------ Startseite: Kacheln */
+.tiles { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+.tile { background: var(--asphalt-2); border-radius: var(--radius); padding: 1.3rem 1.4rem 1.2rem; display: flex; flex-direction: column; }
+.tile h2 { font-size: 1.5rem; }
+.tile > p:last-child { margin: auto 0 0; padding-top: .6rem; }
+.tile-num b { font-size: 1.3rem; font-stretch: 72%; font-variant-numeric: tabular-nums; }
+.tile-car { display: grid; grid-template-columns: 1fr auto; gap: .2rem .6rem; margin-bottom: .7rem; font-size: .95rem; }
+.tile-car .meter { grid-column: 1 / -1; }

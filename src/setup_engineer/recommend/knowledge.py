@@ -28,6 +28,8 @@ class Candidate:
     incar_channel: str | None = None  # im Auto verstellbar -> A-B-A in einer Session möglich
     exclude_fragments: tuple[str, ...] = ()
     applies_to: tuple[str, ...] = field(default_factory=tuple)  # leer = alle Autos; sonst Teile des CarPath
+    # Ersatzmuster, falls ein Auto (z. B. GT3) die Einstellung anders benennt; erst setup_fragments, dann diese
+    alt_fragments: tuple[tuple[str, ...], ...] = ()
 
 
 CANDIDATES: list[Candidate] = [
@@ -184,12 +186,23 @@ CANDIDATES: list[Candidate] = [
 ]
 
 
+# Ersatzmuster je Einstellung – GT3-Setups benennen manches anders als der GTP
+_ALT = {
+    ("front", "arbadj"): (("front", "arbblade"), ("front", "arbsetting"), ("front", "arb")),
+    ("rear", "arbadj"): (("rear", "arbblade"), ("rear", "arbsetting"), ("rear", "arb")),
+    ("rearwingangle",): (("wingangle",), ("wingsetting",), ("wing",)),
+    ("tractioncontrolslip",): (("tractioncontrol",),),
+}
+
+
 def find_parameter(setup, cand: Candidate):
     """Den Setup-Wert zu einem Kandidaten finden (oder None)."""
-    frags = [f.lower() for f in cand.setup_fragments]
     excl = [f.lower() for f in cand.exclude_fragments]
-    for path, v in setup.values.items():
-        p = path.lower()
-        if all(f in p for f in frags) and not any(f in p for f in excl) and not v.likely_read_only:
-            return v
+    patterns = (cand.setup_fragments, *cand.alt_fragments, *_ALT.get(cand.setup_fragments, ()))
+    for pattern in patterns:
+        frags = [f.lower() for f in pattern]
+        for path, v in setup.values.items():
+            p = path.lower()
+            if all(f in p for f in frags) and not any(f in p for f in excl) and not v.likely_read_only:
+                return v
     return None
