@@ -132,14 +132,18 @@ def analyze_file(path: str | Path) -> SessionAnalysis:
         notes.append(str(exc))
 
     model = fit_steer_model(laps) if laps.valid else None
+    return _diagnose(ibt, inventory, setup, laps, corners, model, notes)
+
+
+def _diagnose(ibt, inventory, setup, laps, corners, model, notes) -> SessionAnalysis:
     balance: list[PhaseBalance] = []
     speed_balance = None
     if model is None:
         notes.append("Lenkmodell nicht bestimmbar (zu wenig Daten im linearen Bereich) – kein Balance-Index")
-    else:
+    elif laps.valid:
         speed_balance = balance_by_speed(laps, model)
         if corners:
-            balance = analyze_balance(laps, corners, model)
+            balance = analyze_balance(laps, corners, model, speed_balance)
 
     platform = analyze_platform(laps, corners, setup) if laps.valid else None
     tires = analyze_tires(laps)
@@ -165,3 +169,22 @@ def analyze_file(path: str | Path) -> SessionAnalysis:
         incar=in_car_settings(laps) if laps.valid else [],
         notes=notes,
     )
+
+
+def analyze_subset(a: SessionAnalysis, lap_numbers: list[int], reason: str = "andere Einstellung") -> SessionAnalysis:
+    """Dieselbe Session, aber nur mit ausgewählten Runden (z. B. eine Einstellungsgruppe eines A-B-A-Tests).
+
+    Kurven und Lenkmodell kommen aus der ganzen Session (mehr Daten, gleiche Strecke und gleiches Auto).
+    """
+    import copy
+
+    keep = set(lap_numbers)
+    laps_copy = []
+    for lap in a.laps.laps:
+        lc = copy.copy(lap)
+        lc.reasons = list(lap.reasons)
+        if lc.valid and lc.number not in keep:
+            lc.invalidate(reason)
+        laps_copy.append(lc)
+    laps = LapSet(ibt=a.ibt, laps=laps_copy, grid=a.laps.grid)
+    return _diagnose(a.ibt, a.inventory, a.setup, laps, a.corners, a.steer_model, [])

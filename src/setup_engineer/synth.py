@@ -65,6 +65,10 @@ class SynthConfig:
     bump_gap_mm: float = 12.0
     hi_res: bool = True
     tricky_name: bool = True  # Sonderzeichen im Fahrernamen (YAML-Robustheit)
+    # A-B-A im Auto: Runde -> Front-Stabi-Wert ab Rundenmitte (None = immer 1)
+    arb_schedule: dict[int, float] | None = None
+    arb_understeer_per_step: float = 0.05  # +5 % Lenküberschuss je Stufe härter
+    arb_time_per_step: float = 0.004  # Tempoverlust je Stufe (relativ)
 
 
 def _curvature(cfg: SynthConfig, ds: float) -> tuple[np.ndarray, np.ndarray]:
@@ -121,14 +125,21 @@ def generate(cfg: SynthConfig = SynthConfig()) -> tuple[dict[str, np.ndarray], s
     def push(name: str, arr: np.ndarray) -> None:
         rows.setdefault(name, []).append(arr)
 
+    arb_now = 1.0
     for lap in range(cfg.laps + 2):  # + Outlap + unvollständige letzte Runde
-        scale = 1.0 + rng.normal(0, cfg.lap_speed_jitter)
+        arb_prev = arb_now
+        if cfg.arb_schedule and lap in cfg.arb_schedule:
+            arb_now = float(cfg.arb_schedule[lap])
+        scale = 1.0 + rng.normal(0, cfg.lap_speed_jitter) - cfg.arb_time_per_step * (arb_now - 1)
         v_s = _speed_profile(kappa, ds, cfg, scale)
         # Fahrer fährt T3 mal zu schnell an (Lap-abhängig)
         t3_over = rng.uniform(0.0, 3.0)  # m/s zu viel Eingangstempo
         t3_mask = seg_id == t3
         v_s = v_s.copy()
         v_s[t3_mask] = np.minimum(v_s[t3_mask] + t3_over, cfg.vmax)
+        # Überfahren kostet: schiebt das Auto, kommt es langsamer aus der Kurve
+        after = np.flatnonzero(seg_id == t3 + 1)[: int(250 / ds)]
+        v_s[after] = np.maximum(v_s[after] - 2.0 * t3_over, 10.0)
 
         # Zeit entlang der Strecke
         dt_s = ds / np.maximum(v_s, 1.0)
@@ -147,6 +158,9 @@ def generate(cfg: SynthConfig = SynthConfig()) -> tuple[dict[str, np.ndarray], s
         us = np.zeros(n_t)
         us[t2_after_apex[idx]] += cfg.car_understeer_t2
         us[(seg_id[idx] == t3)] += cfg.driver_understeer_t3 * t3_over
+        # Front-Stabi: ab Rundenmitte neuer Wert (Umstell-Runde enthält beide Werte)
+        arb = np.where(np.arange(n_t) < n_t // 2, arb_prev, arb_now)
+        us += cfg.arb_understeer_per_step * (arb - 1) * (np.abs(k) > 1 / 400)
         steer = cfg.steer_gain * k * (1 + us) + rng.normal(0, 0.004, n_t)
 
         dvdt = np.gradient(v, 1 / TICK)
@@ -175,6 +189,7 @@ def generate(cfg: SynthConfig = SynthConfig()) -> tuple[dict[str, np.ndarray], s
         push("TrackTempCrew", np.full(n_t, 31.0 + lap * 0.1, dtype=np.float32))
         push("AirTemp", np.full(n_t, 22.0, dtype=np.float32))
         push("BrakeABSactive", (brake > 0.9) & (rng.random(n_t) < 0.5))
+        push("dcAntiRollFront", arb.astype(np.float32))
         push("LapLastLapTime", np.full(n_t, lap_times[-1] if lap_times else 0.0, dtype=np.float32))
         for w, base in (("LF", 0.055), ("RF", 0.055), ("LR", 0.075), ("RR", 0.075)):
             front = w[1] == "F"
@@ -232,8 +247,8 @@ CarSetup:
   RightRear:
    SpringRate: 150 N/mm
    BumpRubberGap: 30.0 mm
-  FrontArb:
-   ArbBlades: 3
+  Front:
+   ArbAdj: 1
   InCarDials:
    BrakePressureBias: 54.5%
    AbsSetting: 4 (ABS)

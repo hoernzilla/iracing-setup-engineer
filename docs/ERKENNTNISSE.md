@@ -61,6 +61,18 @@
   - Rundenstreuung des Fahrers ≈ ±0,3 s → für 0,2 s Effekt braucht es grob 30+ Runden je Variante;
     bessere Testabläufe (A-B-A in einer Session) nötig.
 
+### Fahrer oder Auto? (Korrektur nach echten Daten)
+- Erste Logik („Abweichung hängt vom Eingangstempo ab → Fahrer“) war falsch für den GTP: In schnellen
+  Kurven schiebt das Auto mit mehr Tempo immer mehr – das ist Fahrzeugverhalten am Limit.
+- Neues Kriterium: Fahrerfehler (Überfahren) nur, wenn mehr Eingangstempo die Abschnittszeit
+  **verschlechtert**. In beiden echten Runs: kein Überfahren gefunden → Untersteuern in T2/T11/T12 ist Setup.
+
+### Empfehlungs-Engine (Stand Run 2)
+1. Stabilisator vorne zurück auf 1 (eigener Test: mit 3 langsamer und mehr Untersteuern)
+2. Stabilisator hinten 15 → 14 (Übersteuern/Durchdrehen am Ausgang, Übersteuern beim Einlenken)
+3. Traktionskontrolle +1 (Durchdrehen; Richtung der Stufen am Display prüfen)
+- Für Run 1 erscheint zusätzlich Rake/Ride Height hinten gegen Highspeed-Untersteuern.
+
 ### Offen
 - Bezugspunkt der Aero-Rechner-Ride-Heights gegenüber den Telemetrie-Kanälen bestätigen.
 - Kerb-/Aufsetz-Grenze an weiteren Strecken prüfen.

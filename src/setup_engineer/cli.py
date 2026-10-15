@@ -1,9 +1,13 @@
 """Kommandozeile.
 
-    setup-engineer analyze  SESSION.ibt [--out ORDNER]
-    setup-engineer compare  A.ibt B.ibt [--out ORDNER]
-    setup-engineer channels SESSION.ibt
-    setup-engineer setup    SESSION.ibt
+    setup-engineer analyze   SESSION.ibt [--out ORDNER]
+    setup-engineer recommend SESSION.ibt [--out ORDNER]
+    setup-engineer compare   A.ibt [B.ibt] [--save] [--out ORDNER]
+    setup-engineer channels  SESSION.ibt
+    setup-engineer setup     SESSION.ibt
+
+compare mit nur EINER Datei vergleicht die Rundengruppen eines A-B-A-Tests
+(Einstellung im Auto während der Session verstellt).
 """
 
 from __future__ import annotations
@@ -14,10 +18,15 @@ from pathlib import Path
 
 from .analysis import analyze_file
 from .channels import build_inventory
-from .compare import ab_compare
+from .compare import ab_compare, ab_within
+from .recommend.engine import recommend
+from .recommend.history import History, record_from_ab
+from .recommend.report import recommend_markdown
 from .ibt import IbtError, IbtFile
 from .report import ab_markdown, session_json, session_markdown
 from .setup import CarSetup
+
+DEFAULT_HISTORY = Path(__file__).resolve().parents[2] / "data" / "history.json"
 
 
 def _write(out: Path | None, name: str, text: str) -> None:
@@ -29,20 +38,50 @@ def _write(out: Path | None, name: str, text: str) -> None:
     print(f"geschrieben: {out / name}")
 
 
+def _history(args: argparse.Namespace) -> History:
+    return History(args.history or DEFAULT_HISTORY)
+
+
 def cmd_analyze(args: argparse.Namespace) -> int:
+    hist = _history(args)
     for path in args.files:
         a = analyze_file(path)
         stem = Path(path).stem
-        _write(args.out, f"{stem}.md", session_markdown(a))
+        recs = recommend_markdown(a, recommend(a, hist), standalone=False)
+        _write(args.out, f"{stem}.md", session_markdown(a, recs))
         if args.out:
             _write(args.out, f"{stem}.json", session_json(a))
     return 0
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    a, b = analyze_file(args.a), analyze_file(args.b)
-    r = ab_compare(a, b)
-    _write(args.out, "ab_vergleich.md", ab_markdown(r, Path(args.a).name, Path(args.b).name))
+    a = analyze_file(args.a)
+    if args.b is None:
+        res = ab_within(a)
+        if res is None:
+            print("Keine Verstellung im Auto zwischen gewerteten Runden gefunden – für A-B-A in einer Session "
+                  "die Einstellung im Auto ändern, oder zwei Dateien angeben.")
+            return 1
+        r, name_a, name_b = res
+        b = None
+        out_name = f"ab_{Path(args.a).stem}.md"
+    else:
+        b = analyze_file(args.b)
+        r = ab_compare(a, b)
+        name_a, name_b = Path(args.a).name, Path(args.b).name
+        out_name = "ab_vergleich.md"
+    _write(args.out, out_name, ab_markdown(r, name_a, name_b))
+    if args.save:
+        hist = _history(args)
+        hist.add(record_from_ab(r, a, b, within_session=b is None))
+        hist.save()
+        print(f"Test in der Historie gespeichert: {hist.path}")
+    return 0
+
+
+def cmd_recommend(args: argparse.Namespace) -> int:
+    a = analyze_file(args.file)
+    _write(args.out, f"empfehlungen_{Path(args.file).stem}.md", recommend_markdown(a, recommend(a, _history(args))))
     return 0
 
 
@@ -81,12 +120,21 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("analyze", help="Session analysieren und Bericht erzeugen")
     s.add_argument("files", nargs="+", type=Path)
     s.add_argument("--out", type=Path, help="Ausgabeordner (sonst Markdown auf die Konsole)")
+    s.add_argument("--history", type=Path, help="Test-Historie (Standard: data/history.json)")
     s.set_defaults(func=cmd_analyze)
 
-    s = sub.add_parser("compare", help="A/B-Vergleich zweier Runs")
-    s.add_argument("a", type=Path)
-    s.add_argument("b", type=Path)
+    s = sub.add_parser("recommend", help="Setup-Empfehlungen für eine Session")
+    s.add_argument("file", type=Path)
     s.add_argument("--out", type=Path)
+    s.add_argument("--history", type=Path)
+    s.set_defaults(func=cmd_recommend)
+
+    s = sub.add_parser("compare", help="A/B-Vergleich zweier Runs oder (eine Datei) der A-B-A-Gruppen")
+    s.add_argument("a", type=Path)
+    s.add_argument("b", type=Path, nargs="?")
+    s.add_argument("--out", type=Path)
+    s.add_argument("--save", action="store_true", help="Ergebnis in der Test-Historie speichern")
+    s.add_argument("--history", type=Path)
     s.set_defaults(func=cmd_compare)
 
     s = sub.add_parser("channels", help="Verfügbare Telemetriekanäle auflisten")

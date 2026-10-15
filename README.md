@@ -29,20 +29,28 @@ Kalibrierung an echten GT3-/GTP-Daten steht noch aus.
 | Ride Height, Rake, Aufsetzer, Bump-Stop-Kontakt, Dämpfer-Histogramme | fertig, Schwellen vorläufig |
 | Fahrstil: Trail Braking, ABS, Konstanz, Vollgaspunkt | fertig |
 | A/B-Vergleich mit Sprit-/Temperaturbereinigung und Signifikanztest | fertig |
+| Verstellungen im Auto (dc*-Kanäle), A-B-A-Vergleich innerhalb einer Session | fertig |
+| A/B-Bericht mit Fazit, Bedingungen, Zeit je Abschnitt, Kurventempo, Plattform, Reifen | fertig |
+| Empfehlungs-Engine: Symptome → bewertete Setup-Änderungen mit Testplan | fertig (GTP), GT3 offen |
+| Test-Historie: gemessene Wirkung fließt in Empfehlungen ein | fertig |
 | Live-Telemetrie (Shared Memory, Windows) | Grundgerüst, ungetestet |
-| Empfehlungs-Engine (Phase 3) | offen |
 
 ## Benutzung (Windows)
 
 1. Python 3.11+ installieren: https://www.python.org/downloads/ – „Add python.exe to PATH“ anhaken.
-2. Eine oder mehrere `.ibt`-Dateien per Drag & Drop auf **`Analyse.bat`** ziehen.
-3. Berichte (`.md` + `.json`) liegen danach im Ordner `Berichte` neben den IBT-Dateien.
+2. **Analyse + Empfehlungen:** `.ibt`-Dateien per Drag & Drop auf **`Analyse.bat`** ziehen.
+3. **Test auswerten:** zwei `.ibt`-Dateien (erst vorher, dann nachher) auf **`Vergleich.bat`** ziehen –
+   oder eine Datei, wenn du während der Session im Auto umgestellt hast (A-B-A). Der Test wird in der
+   Historie gespeichert und verbessert künftige Empfehlungen.
+4. Berichte liegen im Ordner `Berichte` neben den IBT-Dateien.
 
 Kommandozeile:
 
 ```
 python -m setup_engineer analyze  SESSION.ibt --out Berichte
-python -m setup_engineer compare  A.ibt B.ibt          # A/B-Test zweier Runs
+python -m setup_engineer recommend SESSION.ibt          # nur Empfehlungen
+python -m setup_engineer compare  A.ibt B.ibt --save   # A/B-Test zweier Runs, in Historie speichern
+python -m setup_engineer compare  SESSION.ibt --save   # A-B-A innerhalb einer Session
 python -m setup_engineer channels SESSION.ibt           # welche Kanäle liefert das Auto?
 python -m setup_engineer setup    SESSION.ibt           # Setup ausgeben
 ```
@@ -69,7 +77,10 @@ src/setup_engineer/
   setup.py      Setup lesen und vergleichen
   channels.py   Kanal-Inventar (GT3 vs. GTP)
   analysis.py   Gesamtablauf einer Session
-  compare.py    A/B-Test
+  incar.py      Verstellungen im Auto (dc*-Kanäle)
+  compare.py    A/B-Test (zwei Runs oder A-B-A in einer Session)
+  compare_detail.py  ausführlicher A/B-Bericht mit Fazit
+  recommend/    Symptome, Wissensbasis, Engine, Test-Historie, Bericht
   report.py     Markdown-/JSON-Berichte
   synth.py      Synthetische Testdaten
   cli.py        Kommandozeile

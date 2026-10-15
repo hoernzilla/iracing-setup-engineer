@@ -28,7 +28,7 @@ def _pct(x: float | None) -> str:
     return _f(None if x is None else x * 100, 0, " %")
 
 
-def session_markdown(a: SessionAnalysis) -> str:
+def session_markdown(a: SessionAnalysis, recommendations: str | None = None) -> str:
     ibt = a.ibt
     L: list[str] = []
     L.append(f"# Analyse: {ibt.car_name} – {ibt.track_name}\n")
@@ -46,6 +46,9 @@ def session_markdown(a: SessionAnalysis) -> str:
         L.append("## Wichtigste Befunde\n")
         L += [f"{i}. {f}" for i, f in enumerate(findings, 1)]
         L.append("")
+
+    if recommendations:
+        L.append(recommendations)
 
     if a.notes:
         L.append("## Hinweise\n")

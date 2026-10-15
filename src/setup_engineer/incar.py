@@ -8,7 +8,7 @@ Wir ermitteln deshalb das tatsächlich gefahrene Setup je Runde.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -56,6 +56,7 @@ class InCarSetting:
     label: str
     per_lap: dict[int, float]  # Rundennummer -> Wert (Median) für gültige Runden
     session_values: list[float]  # alle vorkommenden Werte in der Session
+    mixed_laps: set[int] = field(default_factory=set)  # Runden, in denen umgestellt wurde
 
     @property
     def constant_in_valid_laps(self) -> bool:
@@ -80,8 +81,9 @@ def in_car_settings(laps: LapSet) -> list[InCarSetting]:
     for ch in _numeric_dc_channels(ibt):
         x = ibt.get(ch)
         per_lap = {lap.number: round(float(np.nanmedian(x[lap.slice])), 3) for lap in laps.valid}
+        mixed = {lap.number for lap in laps.valid if np.nanmax(x[lap.slice]) - np.nanmin(x[lap.slice]) > 1e-6}
         session_values = sorted({round(float(v), 3) for v in np.unique(x[np.isfinite(x)])})
-        out.append(InCarSetting(ch, label(ch), per_lap, session_values))
+        out.append(InCarSetting(ch, label(ch), per_lap, session_values, mixed))
     return out
 
 
@@ -96,12 +98,15 @@ def lap_groups(settings: list[InCarSetting]) -> dict[tuple[tuple[str, float], ..
     Mehr als eine Gruppe = innerhalb der gewerteten Runden wurde verstellt
     -> Vergleich unter (nahezu) gleichen Bedingungen möglich.
     """
-    varying = [s for s in settings if not s.constant_in_valid_laps]
+    varying = [s for s in settings if not s.constant_in_valid_laps or s.mixed_laps]
     if not varying:
         return {}
+    mixed = set().union(*(s.mixed_laps for s in varying))
     groups: dict[tuple[tuple[str, float], ...], list[int]] = {}
     laps_numbers = sorted(varying[0].per_lap)
     for n in laps_numbers:
+        if n in mixed:
+            continue  # Umstell-Runde: zwei Einstellungen in einer Runde -> nicht werten
         key = tuple((s.label, s.per_lap[n]) for s in varying)
         groups.setdefault(key, []).append(n)
-    return groups
+    return groups if len(groups) > 1 else {}

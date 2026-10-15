@@ -280,3 +280,33 @@ def ab_compare(a: SessionAnalysis, b: SessionAnalysis) -> ABResult:
 
     result.detail = build_detail(result, a, b)
     return result
+
+
+def ab_within(a: SessionAnalysis) -> tuple["ABResult", str, str] | None:
+    """A/B innerhalb EINER Session: Rundengruppen nach Verstellung im Auto.
+
+    Bei A-B-A werden beide A-Abschnitte zusammengefasst. A = Einstellung der
+    ersten Gruppe (Basis), B = größte andere Gruppe.
+    """
+    from .analysis import analyze_subset
+    from .incar import lap_groups
+
+    groups = lap_groups(a.incar)
+    if len(groups) < 2:
+        return None
+    items = list(groups.items())
+    base_key, base_laps = min(items, key=lambda kv: min(kv[1]))
+    others = [kv for kv in items if kv[0] != base_key]
+    other_key, other_laps = max(others, key=lambda kv: len(kv[1]))
+
+    def name(key) -> str:
+        return ", ".join(f"{lbl} {v:g}" for lbl, v in key)
+
+    sa = analyze_subset(a, base_laps)
+    sb = analyze_subset(a, other_laps)
+    r = ab_compare(sa, sb)
+    mixed = sorted(set().union(*(s.mixed_laps for s in a.incar)))
+    if mixed:
+        r.notes.append(f"Umstell-Runde(n) {', '.join(map(str, mixed))} nicht gewertet (zwei Einstellungen in einer Runde).")
+    r.notes.append("Vergleich innerhalb einer Session – Bedingungen nahezu gleich, Ergebnis besonders belastbar.")
+    return r, f"{name(base_key)} (Runden {', '.join(map(str, base_laps))})", f"{name(other_key)} (Runden {', '.join(map(str, other_laps))})"

@@ -218,5 +218,60 @@ class TestRealGTPRepeat(unittest.TestCase):
         self.assertAlmostEqual(sum(s.delta for s in r.sections), r.mean_b - r.mean_a, delta=0.4)
 
 
+class TestWithinSession(unittest.TestCase):
+    """A-B-A im Auto: Front-Stabi 1 -> 3 -> 1 innerhalb einer Session."""
+
+    def test_groups_and_balance_shift(self) -> None:
+        from setup_engineer.compare import ab_within
+
+        with tempfile.TemporaryDirectory() as d:
+            f = make_file(Path(d) / "aba.ibt", SynthConfig(seed=7, laps=16, arb_schedule={6: 3, 11: 1}))
+            r, name_a, name_b = ab_within(analyze_file(f))
+        self.assertIn("Stabilisator vorne 1", name_a)
+        self.assertIn("Stabilisator vorne 3", name_b)
+        self.assertTrue(any("Umstell-Runde" in n for n in r.notes))
+        mid = [x for x in r.balance if x.zone == "Tempo 150–200 km/h"][0]
+        self.assertAlmostEqual(mid.b - mid.a, 0.10, delta=0.04)  # 2 Stufen × 5 %
+        self.assertEqual([c.after for c in r.setup_changes], ["3"])
+
+
+@unittest.skipUnless(REAL_GTP.exists() and REAL_GTP2.exists(), "echte GTP-Dateien nicht vorhanden")
+class TestRecommendReal(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from setup_engineer.recommend.history import History, record_from_ab
+
+        cls.a1, cls.a2 = analyze_file(REAL_GTP), analyze_file(REAL_GTP2)
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.hist = History(Path(cls.tmp.name) / "h.json")
+        cls.hist.add(record_from_ab(ab_compare(cls.a1, cls.a2), cls.a1, cls.a2))
+        cls.hist.save()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.tmp.cleanup()
+
+    def test_revert_slower_change_first(self) -> None:
+        from setup_engineer.recommend.engine import recommend
+
+        rs = recommend(self.a2, self.hist)
+        first = rs.recommendations[0]
+        self.assertIsNotNone(first.revert_of)
+        self.assertEqual((first.current, first.proposed), ("3", "1"))
+        self.assertTrue(first.incar)
+
+    def test_covers_aero_and_rear(self) -> None:
+        from setup_engineer.recommend.engine import recommend
+
+        rs = recommend(self.a1, self.hist)
+        titles = [r.candidate.key for r in rs.recommendations]
+        self.assertIn("arb_rear_soft", titles)
+        self.assertTrue({"rear_rh_up", "wing_down", "rear_third_stiff"} & set(titles))
+        self.assertNotIn("arb_front_stiff", titles)  # getestet und langsamer
+
+    def test_no_overdriving_in_real_data(self) -> None:
+        self.assertFalse([b for b in self.a1.balance if b.verdict == "Fahrer"])
+
+
 if __name__ == "__main__":
     unittest.main()
