@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Wir messen, was ein Setup wirklich bewirkt{% endblock %}
+{% block body_class %}page-landing{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="wrap hero-text">
+    <h1>Wir messen, was ein Setup wirklich bewirkt.</h1>
+    <p class="lead">
+      Lade deine iRacing-Telemetrie hoch. Wir werten aus, wo dein Auto schiebt oder übersteuert,
+      ob es am Setup oder an der Linie liegt – und sammeln gemeinsam, was eine Änderung tatsächlich bringt.
+    </p>
+    <div class="hero-actions">
+      {% if discord_ready %}
+        <a class="btn btn-discord" href="/login">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.2a18 18 0 0 0-5.5 0L8.7 3a19.6 19.6 0 0 0-4.9 1.5C.7 9.1-.2 13.6.3 18.1a19.8 19.8 0 0 0 6 3l1.3-2.1a12.8 12.8 0 0 1-2-1l.5-.4a14 14 0 0 0 12 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.7 19.7 0 0 0 6-3c.5-5.2-.9-9.7-3.6-13.7ZM8 15.4c-1.2 0-2.1-1-2.1-2.3S6.8 10.8 8 10.8s2.2 1 2.1 2.3c0 1.2-.9 2.3-2.1 2.3Zm8 0c-1.2 0-2.1-1-2.1-2.3s.9-2.3 2.1-2.3 2.2 1 2.1 2.3c0 1.2-.9 2.3-2.1 2.3Z"/></svg>
+          Mit Discord anmelden
+        </a>
+        <p class="fine">Nur für Mitglieder unseres Discord-Servers. Wir sehen deinen Namen und dein Profilbild – keine E-Mail, keine anderen Server.</p>
+      {% else %}
+        <p class="notice">Die Anmeldung wird gerade eingerichtet. Schau in Kürze wieder vorbei.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <figure class="trace" aria-labelledby="trace-caption">
+    <svg viewBox="0 -34 1000 320" preserveAspectRatio="none" class="trace-svg" role="img"
+         aria-label="Geschwindigkeit des {{ hero.car }} über eine Runde in {{ hero.track }}, Bestzeit {{ hero.lap_text }}, Spitze {{ hero.vmax }} km/h">
+      <g class="trace-grid">
+        {% for kmh in [100, 200, 300] %}
+          {% set y = 260 - (kmh - 80) / 240 * 260 %}
+          <line x1="0" x2="1000" y1="{{ y }}" y2="{{ y }}" />
+        {% endfor %}
+      </g>
+      <path class="trace-area" d="{{ hero.area }}" />
+      <path class="trace-line" d="{{ hero.path }}" pathLength="1" />
+      <g class="trace-corners">
+        {% for c in hero.corners %}
+          <line x1="{{ c.x }}" x2="{{ c.x }}" y1="{{ c.y + 6 }}" y2="268" />
+        {% endfor %}
+      </g>
+    </svg>
+    <div class="trace-labels" aria-hidden="true">
+      {% for kmh in [100, 200, 300] %}
+        <span class="trace-kmh" style="top: calc({{ (260 - (kmh - 80) / 240 * 260 + 34) / 320 * 100 }}% - .6em)">{{ kmh }}</span>
+      {% endfor %}
+      {% for c in hero.corners %}
+        <span class="trace-corner{% if loop.index is even %} alt{% endif %}{% if c.tight %} tight{% endif %}" style="left: {{ c.pct * 100 }}%">
+          <b>{{ c.name }}</b> <span class="kmh">{{ c.kmh }}</span>
+        </span>
+      {% endfor %}
+    </div>
+    <figcaption id="trace-caption" class="wrap"><span>
+      {{ hero.car }}, {{ hero.track }}: eine Runde in {{ hero.lap_text }}, Geschwindigkeit in km/h. Die Kerben sind die
+      Kurven – und genau dort sucht die Auswertung nach Zeit.
+    </span></figcaption>
+  </figure>
+</section>
+
+<section class="wrap block">
+  <h2>So läuft es ab</h2>
+  <ol class="steps">
+    <li>
+      <h3>Anmelden</h3>
+      <p>Mit deinem Discord-Konto. Wer Mitglied bei {{ community }} ist, ist sofort drin.</p>
+    </li>
+    <li>
+      <h3>Datei hochladen</h3>
+      <p>In iRacing mit <kbd>Alt</kbd> + <kbd>L</kbd> aufzeichnen. Die <code>.ibt</code>-Dateien liegen unter
+        <code>Dokumente\iRacing\telemetry</code>. Einfach ins Upload-Feld ziehen.</p>
+    </li>
+    <li>
+      <h3>Auswertung lesen</h3>
+      <p>Nach wenigen Sekunden: Balance pro Kurve, Plattform, Reifen und Setup-Empfehlungen.
+        Hast du im Auto umgestellt, vergleichen wir die Runden davor und danach.</p>
+    </li>
+  </ol>
+</section>
+
+<section class="wrap block split">
+  <div>
+    <h2>Warum gemeinsam?</h2>
+    <p>Ein einzelner Test sagt wenig. Wenn viele von uns dieselbe Änderung ausprobieren, sehen wir,
+      was sie in diesem Auto wirklich bewirkt – gemessen, nicht geschätzt. Das ist ein Experiment:
+      Ob der Ansatz so gut funktioniert wie erhofft, finden wir zusammen heraus.</p>
+    {% if totals.sessions %}
+      <p class="tally">Bisher dabei: {{ totals.drivers }} Fahrer, {{ totals.sessions }} Sessions,
+        {{ totals.laps }} gewertete Runden, {{ totals.tests }} Tests.</p>
+    {% endif %}
+  </div>
+  <div>
+    <h2>Was mit deinen Daten passiert</h2>
+    <ul class="plain">
+      <li>Deine Dateien sieht niemand außer dir und den Projekt-Admins.</li>
+      <li>Ins gemeinsame Wissen fließt nur, was eine Änderung bewirkt hat – nicht, wer wie schnell war.</li>
+      <li>Du kannst jede Datei jederzeit wieder löschen.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

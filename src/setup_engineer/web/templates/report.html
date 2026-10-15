@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ "Vergleich" if kind == "vergleich" else "Auswertung" }} {{ row.car or row.filename }}{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <p class="back"><a href="/meine-daten">Zurück zu meinen Daten</a></p>
+  <div class="report-head">
+    <h1>{{ row.car or row.filename }}</h1>
+    <p>{{ row.track or "" }}{% if row.session_start %}, gefahren am {{ row.session_start | datum }}{% endif %}</p>
+    {% if row.ab_summary %}
+      <nav class="tabs" aria-label="Berichte">
+        <a href="/bericht/{{ row.id }}" {% if kind != "vergleich" %}aria-current="page"{% endif %}>Auswertung</a>
+        <a href="/bericht/{{ row.id }}/vergleich" {% if kind == "vergleich" %}aria-current="page"{% endif %}>Vergleich vorher und nachher</a>
+      </nav>
+    {% endif %}
+    {% if row.description or row.feeling %}
+      <dl class="notes">
+        {% if row.description %}<dt>Getestet</dt><dd>{{ row.description }}</dd>{% endif %}
+        {% if row.feeling %}<dt>Gefühl</dt><dd>{{ row.feeling }}</dd>{% endif %}
+      </dl>
+    {% endif %}
+  </div>
+  <article class="report">
+    {{ html | safe }}
+  </article>
+</div>
+{% endblock %}

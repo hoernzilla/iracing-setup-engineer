@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Setup-Engineer{% endblock %} – Setup-Engineer</title>
+  <meta name="description" content="Community-Projekt: iRacing-Telemetrie sammeln und messen, was Setup-Änderungen wirklich bewirken.">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip" href="#inhalt">Zum Inhalt springen</a>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="wordmark" href="/">
+        <svg class="wordmark-mark" viewBox="0 0 40 24" aria-hidden="true"><path d="M2 20 L10 20 L14 8 L20 16 L26 4 L30 12 L38 12" /></svg>
+        <span>Setup-Engineer</span>
+      </a>
+      <nav class="topnav" aria-label="Hauptmenü">
+        {% if user and user.consent_at %}
+          <a href="/meine-daten" {% if request.url.path == '/meine-daten' %}aria-current="page"{% endif %}>Meine Daten</a>
+          {% if admin %}<a href="/admin" {% if request.url.path == '/admin' %}aria-current="page"{% endif %}>Übersicht</a>{% endif %}
+          <span class="me">
+            {% if user.avatar %}<img src="{{ user.avatar }}" alt="" width="28" height="28">{% endif %}
+            {{ user.display_name or user.username }}
+          </span>
+          <a href="/logout">Abmelden</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main id="inhalt">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <p>Ein Community-Projekt von {{ community }}. Kostenlos, ohne Werbung.</p>
+      <p><a href="/datenschutz">Datenschutz</a> <span class="sep" aria-hidden="true">/</span> Version {{ version }}</p>
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

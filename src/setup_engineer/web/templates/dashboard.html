@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Meine Daten{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <h1>Telemetrie hochladen</h1>
+
+  <form id="upload-form" class="upload" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="pitbox" id="dropzone">
+      <input type="file" id="file-input" name="files" accept=".ibt" multiple class="visually-hidden">
+      <label for="file-input" class="pitbox-label">
+        <span class="pitbox-title">Dateien hierher ziehen oder <u>auswählen</u></span>
+        <span class="pitbox-hint">.ibt-Dateien aus Dokumente\iRacing\telemetry, bis {{ max_upload_mb }} MB pro Datei, bis zu {{ max_files }} auf einmal.</span>
+      </label>
+      <ul class="picked" id="picked" aria-live="polite"></ul>
+    </div>
+
+    <fieldset class="test-type">
+      <legend>Was ist das für eine Aufnahme?</legend>
+      <label class="choice">
+        <input type="radio" name="test_type" value="normal" checked>
+        <span><b>Normale Runs</b> Einfach gefahren, nichts verstellt. Liefert Grunddaten zu Auto und Fahrstil.</span>
+      </label>
+      <label class="choice">
+        <input type="radio" name="test_type" value="aba">
+        <span><b>A-B-A-Test im Auto</b> Eine Einstellung im Auto umgestellt und wieder zurück. Eine Datei.</span>
+      </label>
+      <label class="choice">
+        <input type="radio" name="test_type" value="garage">
+        <span><b>Garage-Test</b> Eine Sache in der Garage geändert. Zwei Dateien: vorher und nachher.</span>
+      </label>
+    </fieldset>
+
+    <div class="fields">
+      <label>
+        <span>Was hast du getestet? <em>optional</em></span>
+        <input type="text" name="description" maxlength="300" placeholder="z. B. Stabi vorne von 3 auf 1">
+      </label>
+      <label>
+        <span>Wie hat es sich angefühlt? <em>optional</em></span>
+        <input type="text" name="feeling" maxlength="300" placeholder="z. B. lenkt besser ein, Heck am Ausgang unruhiger">
+      </label>
+    </div>
+
+    <div class="submit-row">
+      <button type="submit" class="btn btn-primary" id="upload-btn" disabled>Hochladen</button>
+      <div class="progress" id="progress" hidden>
+        <div class="progress-bar"><span id="progress-fill"></span></div>
+        <span id="progress-text" aria-live="polite"></span>
+      </div>
+    </div>
+    <p class="form-msg" id="form-msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <section class="block">
+    <h2>Deine Uploads</h2>
+    {% if uploads %}
+      <div class="table-scroll">
+        <table class="timing">
+          <thead>
+            <tr><th>Gefahren</th><th>Auto</th><th>Strecke</th><th class="num">Runden</th><th class="num">Bestzeit</th><th>Art</th><th>Stand</th><th><span class="visually-hidden">Aktionen</span></th></tr>
+          </thead>
+          <tbody>
+          {% for u in uploads %}
+            <tr data-id="{{ u.id }}" data-status="{{ u.status }}">
+              <td>{{ (u.session_start or u.uploaded_at) | datum }}</td>
+              <td>{{ u.car or u.filename }}</td>
+              <td>{{ u.track or "–" }}</td>
+              <td class="num">{% if u.laps_valid is not none %}{{ u.laps_valid }}<span class="dim">/{{ u.laps_total }}</span>{% else %}–{% endif %}</td>
+              <td class="num lap">{{ u.best_lap_s | lap }}</td>
+              <td>{{ test_types[u.test_type] }}</td>
+              <td>
+                <span class="state state-{{ u.status }}">{{ u.status }}</span>
+                {% if u.error %}<span class="state-error">{{ u.error }}</span>{% endif %}
+                {% if u.ab %}<span class="ab-line">{{ u.ab.changes }}: {{ u.ab.verdict }}{% if u.ab.effect_s is not none %} ({{ "%+.3f"|format(u.ab.effect_s) }} s){% endif %}</span>{% endif %}
+              </td>
+              <td class="actions">
+                {% if u.status == "fertig" %}<a href="/bericht/{{ u.id }}">Auswertung</a>{% endif %}
+                {% if u.ab %}<a href="/bericht/{{ u.id }}/vergleich">Vergleich</a>{% endif %}
+                <form method="post" action="/upload/{{ u.id }}/loeschen" class="inline" onsubmit="return confirm('Datei und Auswertung endgültig löschen?')">
+                  <input type="hidden" name="csrf" value="{{ csrf }}">
+                  <button type="submit" class="linklike danger">Löschen</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="fine">Bestzeit und Runden zählen nur saubere Runden: ohne Out- und Inlap, ohne Ausflüge neben die Strecke.</p>
+    {% else %}
+      <p class="empty">Noch nichts hochgeladen. Deine erste Datei liegt unter <code>Dokumente\iRacing\telemetry</code> – am besten eine Session mit zehn oder mehr sauberen Runden.</p>
+    {% endif %}
+  </section>
+
+  <section class="block">
+    <h2>Stand der Community</h2>
+    {% if coverage %}
+      <p class="fine">Tests je Auto. Ab {{ goal1 }} Tests sind die Richtungen der Änderungen abgesichert, ab {{ goal2 }} auch ihre Stärke.</p>
+      <ul class="coverage">
+        {% for c in coverage %}
+          {% set pct1 = [c.tests / goal1 * 100, 100] | min %}
+          {% set pct2 = [c.tests / goal2 * 100, 100] | min %}
+          <li>
+            <div class="coverage-head">
+              <b>{{ c.car }}</b>
+              <span>{{ c.tests }} Tests, {{ c.laps }} Runden, {{ c.drivers }} {{ "Fahrer" }}, {{ c.tracks }} {{ "Strecke" if c.tracks == 1 else "Strecken" }}</span>
+            </div>
+            <div class="meter" role="img" aria-label="{{ c.tests }} von {{ goal2 }} Tests">
+              <span class="meter-fill" style="width: {{ pct2 }}%"></span>
+              <span class="meter-mark" style="left: {{ goal1 / goal2 * 100 }}%"></span>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">Noch keine ausgewerteten Daten. Die ersten Uploads legen hier den Grundstein.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/upload.js?v={{ version }}" defer></script>{% endblock %}

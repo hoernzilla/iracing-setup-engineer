@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Datenschutz{% endblock %}
+{% block content %}
+<div class="wrap page narrow prose">
+  <h1>Datenschutz</h1>
+  <h2>Wer verantwortlich ist</h2>
+  {% if operator_name %}
+    <p>{{ operator_name }}{% if operator_contact %}<br>Kontakt: {{ operator_contact }}{% endif %}</p>
+  {% else %}
+    <p class="notice">Angaben zum Verantwortlichen folgen.</p>
+  {% endif %}
+
+  <h2>Worum es geht</h2>
+  <p>Dieses Portal ist ein nicht-kommerzielles Projekt von {{ community }}. Mitglieder laden ihre iRacing-Telemetrie hoch,
+    um Auswertungen zu erhalten und gemeinsam zu messen, wie Setup-Änderungen wirken.</p>
+
+  <h2>Welche Daten wir verarbeiten</h2>
+  <ul>
+    <li><b>Anmeldung über Discord:</b> Nutzer-ID, Nutzername, Anzeigename bzw. Spitzname auf unserem Server, Profilbild,
+      Rollen auf unserem Server. Abgefragt wird nur, ob du Mitglied unseres Servers bist – nicht deine E-Mail-Adresse
+      und nicht deine anderen Server.</li>
+    <li><b>Telemetrie-Dateien (.ibt):</b> Fahrdaten einer iRacing-Session. Sie enthalten neben den Messwerten auch
+      Angaben zur Session, etwa Strecke, Auto, Setup sowie die iRacing-Namen der Teilnehmer der Session.</li>
+    <li><b>Deine Angaben</b> beim Hochladen (was getestet wurde, wie es sich angefühlt hat).</li>
+    <li><b>Technisch notwendig:</b> ein Sitzungs-Cookie, damit du angemeldet bleibst. Keine Tracking- oder Werbe-Cookies,
+      keine externen Schriften oder Analysedienste. Profilbilder werden direkt von Discord geladen.</li>
+  </ul>
+
+  <h2>Wofür und auf welcher Grundlage</h2>
+  <p>Für deine Auswertungen und das gemeinsame Wissen der Community, auf Grundlage deiner Einwilligung
+    beim ersten Anmelden. Du kannst sie jederzeit widerrufen.</p>
+
+  <h2>Wer Zugriff hat</h2>
+  <p>Deine Dateien und Auswertungen siehst nur du und die Projekt-Admins. In das gemeinsame Wissen fließt nur die
+    gemessene Wirkung von Setup-Änderungen, ohne Namen und ohne Rundenzeiten-Vergleiche zwischen Fahrern.
+    Die Daten liegen auf dem Server des Projekts und werden nicht an Dritte weitergegeben.</p>
+
+  <h2>Wie lange</h2>
+  <p>Bis du sie löschst oder das Projekt endet. Jede Datei kannst du auf „Meine Daten“ selbst löschen;
+    damit wird auch ihr Beitrag zum gemeinsamen Wissen entfernt.</p>
+
+  <h2>Deine Rechte</h2>
+  <p>Du kannst Auskunft, Berichtigung, Löschung und Einschränkung verlangen, der Verarbeitung widersprechen und
+    dich bei einer Datenschutz-Aufsichtsbehörde beschweren. Wende dich dafür an die Admins{% if operator_contact %} ({{ operator_contact }}){% endif %}.</p>
+</div>
+{% endblock %}

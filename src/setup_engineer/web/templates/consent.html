@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Bevor es losgeht{% endblock %}
+{% block content %}
+<div class="wrap page narrow">
+  <h1>Bevor es losgeht</h1>
+  <p class="lead">Kurz, was mit deinen Daten passiert. Ohne deine Zustimmung können wir keine Dateien annehmen.</p>
+  <h2>Was wir speichern</h2>
+  <ul class="plain">
+    <li>Von Discord: deine Nutzer-ID, deinen Namen und Spitznamen auf unserem Server, dein Profilbild und deine Rollen dort. Keine E-Mail-Adresse, keine anderen Server.</li>
+    <li>Deine hochgeladenen <code>.ibt</code>-Dateien und die daraus erstellten Auswertungen.</li>
+  </ul>
+  <h2>Wofür</h2>
+  <ul class="plain">
+    <li>Für deine eigenen Auswertungen und Empfehlungen.</li>
+    <li>Für das gemeinsame Wissen der Community: Dort landet nur, welche Setup-Änderung was bewirkt hat – keine Rundenzeiten-Ranglisten, keine Namen.</li>
+    <li>Deine Dateien sehen nur du und die Projekt-Admins.</li>
+  </ul>
+  <h2>Löschen</h2>
+  <p>Du kannst jede Datei auf „Meine Daten“ selbst löschen. Damit verschwindet auch ihr Beitrag zum gemeinsamen Wissen.
+    Möchtest du dein ganzes Konto entfernen, sag den Admins Bescheid{% if operator_contact %} ({{ operator_contact }}){% endif %}.</p>
+  <p><a href="/datenschutz">Ausführliche Datenschutzhinweise</a></p>
+
+  <form method="post" class="consent-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label class="check">
+      <input type="checkbox" name="zustimmung" value="ja" {% if missing %}aria-invalid="true" autofocus{% endif %}>
+      <span>Ich bin einverstanden, dass meine Telemetrie wie beschrieben gespeichert und ausgewertet wird.</span>
+    </label>
+    {% if missing %}<p class="form-msg error">Bitte das Häkchen setzen, um fortzufahren.</p>{% endif %}
+    <div class="submit-row">
+      <button type="submit" class="btn btn-primary">Zustimmen und weiter</button>
+      <a href="/logout" class="linklike">Abbrechen und abmelden</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

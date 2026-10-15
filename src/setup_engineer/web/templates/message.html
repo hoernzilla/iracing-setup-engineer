@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="wrap page narrow message">
+  <h1>{{ title }}</h1>
+  <p class="lead">{{ text }}</p>
+  {% if action %}<p><a class="btn btn-primary" href="{{ action[0] }}">{{ action[1] }}</a></p>{% endif %}
+  <p><a href="/">Zur Startseite</a></p>
+</div>
+{% endblock %}

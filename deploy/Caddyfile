@@ -1,0 +1,12 @@
+# Caddy: macht das Portal unter https://DEINE-DOMAIN erreichbar und holt das
+# HTTPS-Zertifikat automatisch (Let's Encrypt).
+# Voraussetzungen: Domain zeigt auf den Server, Ports 80 und 443 sind offen.
+# Start (im Ordner mit caddy.exe und dieser Datei):  caddy run
+
+telemetrie.example.de {
+	# Uploads bis 4 GB pro Anfrage zulassen (10 Dateien x 400 MB)
+	request_body {
+		max_size 4GB
+	}
+	reverse_proxy 127.0.0.1:8420
+}

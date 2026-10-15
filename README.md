@@ -4,6 +4,7 @@ Privates Projekt: ein lokaler „Race Engineer“ für iRacing, der aus der eige
 ein besseres Setup ableitet – mit Fokus auf **GT3** und **GTP**.
 
 **Bedienung unter Windows: siehe [ANLEITUNG.md](ANLEITUNG.md).**
+**Community-Portal (Upload über Discord-Login) einrichten: siehe [docs/PORTAL.md](docs/PORTAL.md).**
 
 Konzept & Marktanalyse: https://claude.ai/code/artifact/ef2f48ff-029a-4ca5-bd09-af62bce56a8c
 
@@ -35,6 +36,7 @@ Kalibrierung an echten GT3-/GTP-Daten steht noch aus.
 | A/B-Bericht mit Fazit, Bedingungen, Zeit je Abschnitt, Kurventempo, Plattform, Reifen | fertig |
 | Empfehlungs-Engine: Symptome → bewertete Setup-Änderungen mit Testplan | fertig (GTP), GT3 offen |
 | Test-Historie: gemessene Wirkung fließt in Empfehlungen ein | fertig |
+| Community-Portal: Discord-Login nur für Server-Mitglieder, Upload, Auswertung, Admin-Übersicht | fertig, lokal getestet |
 | Live-Telemetrie (Shared Memory, Windows) | Grundgerüst, ungetestet |
 
 ## Benutzung (Windows)
@@ -83,6 +85,7 @@ src/setup_engineer/
   compare.py    A/B-Test (zwei Runs oder A-B-A in einer Session)
   compare_detail.py  ausführlicher A/B-Bericht mit Fazit
   recommend/    Symptome, Wissensbasis, Engine, Test-Historie, Bericht
+  web/          Community-Portal (Starlette): Discord-Login, Upload, Auswertung, Seiten
   report.py     Markdown-/JSON-Berichte
   synth.py      Synthetische Testdaten
   cli.py        Kommandozeile

@@ -15,3 +15,7 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# Portal: Zugangsdaten und gesammelte Daten nie ins Repo
+portal.env
+portal-data/
