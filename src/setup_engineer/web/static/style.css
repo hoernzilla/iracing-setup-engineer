@@ -525,3 +525,5 @@ ul.plain.bad li::marker { color: var(--bremse); content: "✕  "; }
 .archive-pick .btn { cursor: pointer; }
 #arch-table-wrap { max-height: 26rem; overflow: auto; }
 .submit-row[hidden], .table-scroll[hidden] { display: none; }
+.gate-confirm { margin-top: 1.5rem; }
+.gate-confirm .gate-end { margin: 0 0 .8rem; padding-top: 0; border-top: 0; }
