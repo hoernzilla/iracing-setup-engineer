@@ -527,3 +527,5 @@ ul.plain.bad li::marker { color: var(--bremse); content: "✕  "; }
 .submit-row[hidden], .table-scroll[hidden] { display: none; }
 .gate-confirm { margin-top: 1.5rem; }
 .gate-confirm .gate-end { margin: 0 0 .8rem; padding-top: 0; border-top: 0; }
+.limits { display: flex; gap: 1rem; flex-wrap: wrap; }
+.stack input[type="number"] { width: 10rem; }

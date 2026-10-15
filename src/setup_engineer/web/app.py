@@ -109,8 +109,6 @@ def create_app(settings: Settings | None = None) -> Starlette:
         operator_contact=s.operator_contact,
         version=__version__,
         test_types=TEST_TYPES,
-        max_upload_mb=s.max_upload_mb,
-        max_files=s.max_files_per_upload,
     )
     hero = _hero_trace()
 
@@ -169,6 +167,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
             admin=is_admin(user),
             csrf=csrf_token(request),
             announcement=db.get_setting("announcement"),
+            max_upload_mb=max_mb(),
+            max_files=max_files(),
         )
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
@@ -356,6 +356,15 @@ def create_app(settings: Settings | None = None) -> Starlette:
         return Response(data, media_type="application/octet-stream",
                         headers={"Content-Disposition": 'attachment; filename="Telemetrie-Pruefen.bat"'})
 
+    def max_mb() -> int:
+        """Größenlimit pro Datei: Einstellung aus der Verwaltung, sonst portal.env."""
+        v = db.get_setting("max_upload_mb")
+        return int(v) if v.isdigit() and int(v) > 0 else s.max_upload_mb
+
+    def max_files() -> int:
+        v = db.get_setting("max_files")
+        return int(v) if v.isdigit() and int(v) > 0 else s.max_files_per_upload
+
     def uploads_paused(user: dict | None) -> bool:
         return db.get_setting("uploads_paused") == "1" and not is_admin(user)
 
@@ -502,6 +511,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
             paused=db.get_setting("uploads_paused") == "1",
             pause_message=db.get_setting("pause_message"),
             archive_is_open=db.get_setting("archive_open", "1") == "1",
+            env_max_mb=s.max_upload_mb,
+            env_max_files=s.max_files_per_upload,
             guide_version=guidelines_version(),
             guide_confirmed=sum(1 for p in db.users_with_stats() if p.get("guidelines_version") == guidelines_version()),
             owners=sorted(s.admin_discord_ids),
@@ -557,11 +568,18 @@ def create_app(settings: Settings | None = None) -> Starlette:
             ann = str(form.get("announcement") or "").strip()[:600]
             paused = form.get("paused") == "1"
             arch = form.get("archive_open") == "1"
+            changes = []
             if arch != (db.get_setting("archive_open", "1") == "1"):
                 db.log(admin_user, "Archiv-Upload " + ("geöffnet" if arch else "geschlossen"))
             db.set_setting("archive_open", "1" if arch else "0")
+            for key, label, lo, hi in (("max_upload_mb", "Max. MB pro Datei", 10, 4000), ("max_files", "Max. Dateien pro Upload", 1, 50)):
+                raw = str(form.get(key) or "").strip()
+                if raw.isdigit():
+                    val = str(min(max(int(raw), lo), hi))
+                    if val != db.get_setting(key):
+                        changes.append(f"{label}: {val}")
+                    db.set_setting(key, val)
             note = str(form.get("pause_message") or "").strip()[:300]
-            changes = []
             if ann != db.get_setting("announcement"):
                 changes.append("Ankündigung " + ("gesetzt" if ann else "entfernt"))
             if paused != (db.get_setting("uploads_paused") == "1"):
@@ -706,12 +724,13 @@ def create_app(settings: Settings | None = None) -> Starlette:
         if uploads_paused(user):
             note = db.get_setting("pause_message")
             return await reject(request, "Uploads sind gerade pausiert." + (f" {note}" if note else ""), 503)
-        limit = s.max_upload_mb * 1024 * 1024
+        limit_mb, nfiles = max_mb(), max_files()
+        limit = limit_mb * 1024 * 1024
         declared = int(request.headers.get("content-length") or 0)
-        if declared > limit * s.max_files_per_upload + 1024 * 1024:
-            return JSONResponse({"error": f"Zu groß – höchstens {s.max_upload_mb} MB pro Datei."}, status_code=413)
+        if declared > limit * nfiles + 1024 * 1024:
+            return JSONResponse({"error": f"Zu groß – höchstens {limit_mb} MB pro Datei und {nfiles} Dateien auf einmal."}, status_code=413)
 
-        form = await request.form(max_files=s.max_files_per_upload, max_fields=20)
+        form = await request.form(max_files=nfiles, max_fields=20)
         files = [f for f in form.getlist("files") if hasattr(f, "filename") and f.filename]
         test_type = str(form.get("test_type") or "normal")
         if test_type not in TEST_TYPES or (test_type == "archiv") != is_archive:
@@ -746,7 +765,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             await f.close()
             if too_big:
                 dest.unlink(missing_ok=True)
-                items.append({"filename": name, "ok": False, "message": f"Größer als {s.max_upload_mb} MB."})
+                items.append({"filename": name, "ok": False, "message": f"Größer als {limit_mb} MB."})
                 continue
             digest = sha.hexdigest()
             dup = db.find_duplicate(user["discord_id"], digest)

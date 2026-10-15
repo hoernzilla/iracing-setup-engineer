@@ -376,7 +376,10 @@ class TestPortal(unittest.TestCase):
         self.assertEqual(status, 503)
         self.assertIn("Wartung", body["error"])
         self.assertIn("Heute Abend Testabend!", Browser(self.base).req("/")[2])
-        act({"action": "einstellungen", "announcement": ""})
+        act({"action": "einstellungen", "announcement": "", "archive_open": "1", "max_upload_mb": "50", "max_files": "3"})
+        self.assertIn("bis 50 MB pro Datei, bis zu 3 auf einmal", admin.req("/meine-daten")[2])
+        self.assertIn("Max. MB pro Datei: 50", admin.req("/admin/protokoll")[2])
+        act({"action": "einstellungen", "archive_open": "1", "max_upload_mb": "400", "max_files": "10"})
         # Sperren mit Aussortieren
         status, _, _ = act({"action": "sperren", "user_id": SECOND["id"], "reason": "unsaubere Daten", "days": "7", "exclude": "1"})
         self.assertEqual(status, 303)
