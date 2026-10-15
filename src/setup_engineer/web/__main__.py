@@ -10,7 +10,10 @@ from .config import load_settings
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 settings = load_settings()
-print(f"Setup-Engineer-Portal startet auf http://{settings.host}:{settings.port}")
+public = settings.discord_redirect_uri.removesuffix("/auth/callback")
+print(f"Setup-Engineer-Portal startet auf Port {settings.port}.")
+print(f"Adresse fuer die Community:  {public}")
+print(f"Auf dem Server selbst:       http://localhost:{settings.port}")
 if not settings.discord_configured:
     print("Hinweis: Discord ist noch nicht eingerichtet (portal.env) – Anmeldung nicht möglich.")
 uvicorn.run(

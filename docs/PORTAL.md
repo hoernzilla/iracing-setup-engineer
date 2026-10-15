@@ -1,7 +1,11 @@
 # Community-Portal einrichten (Windows-Server)
 
-Das Portal läuft als eigenes Programm neben dem RaceDirector – eigener Ordner, eigener Port (8420).
+Das Portal läuft als eigenes Programm neben dem RaceDirector – eigener Ordner, eigener Port.
 Am RaceDirector wird nichts verändert.
+
+Erreichbar ist es wie die Regie direkt über die Server-IP und einen eigenen Port:
+**`http://SERVER-IP:29630`**. Bewusst nicht Port 80 oder 443, damit bei einem Blick auf die offenen
+Ports kein Standard-Webserver auffällt. Eine Domain wird nicht gebraucht.
 
 Gesamtdauer beim ersten Mal: etwa 30–45 Minuten.
 
@@ -15,12 +19,9 @@ Gesamtdauer beim ersten Mal: etwa 30–45 Minuten.
    - **Client ID** kopieren → später in `DISCORD_CLIENT_ID`.
    - Bei **Client Secret** auf **Reset Secret** klicken, kopieren → später in `DISCORD_CLIENT_SECRET`.
      Das Secret ist wie ein Passwort: nicht weitergeben, nicht in den Chat posten.
-   - Unter **Redirects** → **Add Redirect** die Adresse eintragen, unter der das Portal erreichbar ist,
-     plus `/auth/callback`. Zum Beispiel:
-     - zum Testen direkt auf dem Server: `http://localhost:8420/auth/callback`
-     - im Betrieb: `https://telemetrie.deine-domain.de/auth/callback`
-
-     Beide dürfen gleichzeitig eingetragen sein. **Save Changes** nicht vergessen.
+   - Unter **Redirects** → **Add Redirect** die Adresse eintragen, die `Portal-Einrichten.bat` am Ende
+     anzeigt, z. B. `http://203.0.113.7:29630/auth/callback` (mit der echten Server-IP).
+     **Save Changes** nicht vergessen.
 4. **Server-ID** eures Community-Discords holen:
    Discord → Einstellungen → Erweitert → **Entwicklermodus** einschalten.
    Dann Rechtsklick auf euren Server → **Server-ID kopieren** → später in `DISCORD_GUILD_ID`.
@@ -39,52 +40,41 @@ Person Mitglied eures Servers ist (Scope `guilds.members.read`).
 2. Falls noch nicht vorhanden: Python 3.11+ von https://www.python.org/downloads/ installieren.
    Im Installer **„Add python.exe to PATH“** anhaken und unter „Customize installation“
    **„Install Python for all users“** wählen (nötig für den Autostart).
-3. **`Portal-Einrichten.bat`** doppelklicken. Sie installiert alles, lädt die Schrift und öffnet
-   `portal.env` im Editor. Dort die Werte aus Schritt 1 eintragen, speichern, schließen.
+3. **`Portal-Einrichten.bat`** mit Rechtsklick → **Als Administrator ausführen**. Sie
+   - installiert alles und lädt die Schrift,
+   - legt `portal.env` an, ermittelt die öffentliche IP des Servers und trägt die Redirect-Adresse ein,
+   - zeigt die Adresse des Portals und die Redirect-Adresse für Discord an,
+   - gibt Port 29630 in der Windows-Firewall frei,
+   - öffnet `portal.env` im Editor: Dort die Werte aus Schritt 1 eintragen, speichern, schließen.
+4. Hat der Hoster im Kundenmenü eine eigene Firewall, dort **TCP-Port 29630** eingehend freigeben.
 
 ## 3. Testen
 
-1. **`Portal-Starten.bat`** doppelklicken. Das Fenster offen lassen.
-2. Auf dem Server im Browser `http://localhost:8420` öffnen.
+1. **`Portal-Starten.bat`** doppelklicken. Das Fenster offen lassen. Es zeigt die Adresse für die Community an.
+2. Von deinem eigenen Rechner aus `http://SERVER-IP:29630` öffnen (mit der echten IP).
 3. **Mit Discord anmelden** → Discord fragt einmal nach der Freigabe → zurück im Portal
-   → Einwilligung bestätigen → eine `.ibt`-Datei hochladen.
+   → Einwilligung und Leitfaden bestätigen → eine `.ibt`-Datei hochladen.
 
-Läuft das, fehlt nur noch die Erreichbarkeit von außen.
+Klappt das, kann der Link in den Community-Discord.
 
-## 4. Von außen erreichbar machen (HTTPS)
+## 4. Port ändern (nur bei Bedarf)
 
-Für die Community braucht das Portal eine Adresse mit `https://`. Empfohlen: **Caddy**, ein kleines
-Programm, das das Zertifikat automatisch besorgt und erneuert.
+Ist 29630 schon belegt oder soll ein anderer Port her:
+1. In `portal.env` `PORTAL_PORT` ändern und in `DISCORD_REDIRECT_URI` denselben Port eintragen.
+2. In der Discord-Anwendung die Redirect-Adresse genauso anpassen.
+3. `Portal-Einrichten.bat` erneut als Administrator ausführen (setzt die Firewall-Freigabe neu),
+   beim Hoster den neuen Port freigeben, Portal neu starten.
 
-Voraussetzungen:
-- eine (Sub-)Domain, z. B. `telemetrie.deine-domain.de`, deren DNS-Eintrag (A-Record) auf die
-  öffentliche IP des Servers zeigt,
-- Ports **80 und 443** in der Server-Firewall bzw. beim Hoster freigegeben.
-  Falls der RaceDirector oder ein anderer Dienst diese Ports schon belegt, vorher Bescheid geben –
-  dann binden wir das Portal dort mit ein.
-
-Schritte:
-1. `caddy_windows_amd64.exe` von https://caddyserver.com/download herunterladen, in `C:\Caddy` legen und
-   in `caddy.exe` umbenennen.
-2. `deploy\Caddyfile` aus dem Projekt nach `C:\Caddy` kopieren und `telemetrie.example.de` durch die
-   eigene Domain ersetzen.
-3. In `portal.env`:
-   - `DISCORD_REDIRECT_URI=https://telemetrie.deine-domain.de/auth/callback`
-   - `PORTAL_HTTPS_ONLY=1`
-   und dieselbe Adresse in der Discord-Anwendung unter Redirects eintragen.
-4. Eingabeaufforderung in `C:\Caddy` öffnen: `caddy run`.
-5. `https://telemetrie.deine-domain.de` aufrufen – fertig.
-
-Das Portal selbst lauscht weiter nur auf `127.0.0.1:8420`, ist also nur über Caddy erreichbar.
+**Zur Verschlüsselung:** Ohne Domain läuft das Portal über `http://`, also unverschlüsselt – das ist bei
+einer Adresse aus IP und Port der Normalfall. Für eine Community-Sammelstelle mit Telemetrie ist das vertretbar; Passwörter gibt es im Portal
+keine, die Anmeldung läuft über Discord. Für den späteren bezahlten Dienst braucht es eine Domain mit
+HTTPS; dann `PORTAL_HTTPS_ONLY=1` setzen.
 
 ## 5. Dauerbetrieb
 
 - **`Portal-Autostart.bat`** mit Rechtsklick → **Als Administrator ausführen**: Das Portal startet dann
   bei jedem Hochfahren automatisch. Abschalten: `Portal-Autostart.bat entfernen` in einer
   Admin-Eingabeaufforderung.
-- Caddy als Dienst: in einer Admin-Eingabeaufforderung in `C:\Caddy`:
-  `sc create Caddy binPath= "C:\Caddy\caddy.exe run --config C:\Caddy\Caddyfile" start= auto`
-  und `sc start Caddy`.
 
 ## Test-Leitfaden
 
@@ -117,4 +107,5 @@ Alles im Ordner `portal-data` neben dem Programm (oder dem in `PORTAL_DATA_DIR` 
 | Discord meldet „Invalid OAuth2 redirect_uri“ | `DISCORD_REDIRECT_URI` und der Eintrag unter Redirects in der Discord-Anwendung müssen zeichengenau gleich sein |
 | „Nur für Mitglieder“, obwohl Mitglied | falsche `DISCORD_GUILD_ID` (Server-ID, nicht Kanal-ID) |
 | Nach dem Login sofort wieder abgemeldet | `PORTAL_HTTPS_ONLY=1`, aber Aufruf über `http://` – entweder HTTPS nutzen oder auf 0 setzen |
-| Upload bricht bei großen Dateien ab | in Caddy `max_size` prüfen; `PORTAL_MAX_UPLOAD_MB` in `portal.env` |
+| Seite lädt von außen nicht | läuft `Portal-Starten.bat`? Firewall-Freigabe (Einrichten als Administrator) und Freigabe beim Hoster für TCP 29630 prüfen; auf dem Server selbst testen mit `http://localhost:29630` |
+| Upload bricht bei großen Dateien ab | `PORTAL_MAX_UPLOAD_MB` in `portal.env` |

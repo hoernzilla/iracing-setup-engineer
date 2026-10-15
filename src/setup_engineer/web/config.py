@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+# Eigener Port statt 80/443, damit das Portal bei einem Port-Scan nicht als Standard-Webserver auffällt
+DEFAULT_PORT = 29630
 
 
 def _read_env_file(path: Path) -> dict[str, str]:
@@ -37,7 +39,7 @@ def _bool(v: str | None, default: bool = False) -> bool:
 class Settings:
     discord_client_id: str = ""
     discord_client_secret: str = ""
-    discord_redirect_uri: str = "http://localhost:8420/auth/callback"
+    discord_redirect_uri: str = f"http://localhost:{DEFAULT_PORT}/auth/callback"
     discord_guild_id: str = ""
     discord_required_role_ids: set[str] = field(default_factory=set)  # leer = alle Server-Mitglieder
     admin_discord_ids: set[str] = field(default_factory=set)
@@ -48,7 +50,7 @@ class Settings:
     max_upload_mb: int = 400
     max_files_per_upload: int = 10
     host: str = "127.0.0.1"
-    port: int = 8420
+    port: int = DEFAULT_PORT
     https_only: bool = False  # True, sobald das Portal über HTTPS erreichbar ist
     session_secret: str = ""
     dev_login: bool = False  # nur zum lokalen Testen ohne Discord
@@ -101,7 +103,7 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         data_dir=Path(get("PORTAL_DATA_DIR", str(Settings.data_dir))),
         max_upload_mb=int(get("PORTAL_MAX_UPLOAD_MB", "400")),
         host=get("PORTAL_HOST", "127.0.0.1"),
-        port=int(get("PORTAL_PORT", "8420")),
+        port=int(get("PORTAL_PORT", str(DEFAULT_PORT))),
         https_only=_bool(get("PORTAL_HTTPS_ONLY"), False),
         session_secret=get("PORTAL_SESSION_SECRET"),
         dev_login=_bool(get("PORTAL_DEV_LOGIN"), False),
