@@ -104,6 +104,19 @@ Wird er inhaltlich geändert, in `web/app.py` das Datum in `GUIDELINES_VERSION` 
 dann muss jeder ihn beim nächsten Besuch erneut bestätigen. Wer wann bestätigt hat, steht in der
 Admin-Übersicht bzw. in `portal.sqlite3` (Spalten `guidelines_version`, `guidelines_at`).
 
+## Aktualisieren
+
+1. Die neue `SetupEngineer-Portal.zip` in den Portal-Ordner oder den Download-Ordner legen.
+2. **`Portal-Aktualisieren.bat`** im Portal-Ordner mit Rechtsklick → **Als Administrator ausführen**.
+
+Die Datei beendet das Portal, legt daneben eine Sicherung `…-Sicherung-Datum` an, spielt den neuen Stand ein
+(`portal.env` und `portal-data` bleiben unberührt), prüft Pakete, Einstellungen und Firewall, startet das Portal und
+prüft, ob es antwortet. Startet es nicht, wird die Sicherung automatisch zurückgespielt.
+Beim allerersten Mal `Portal-Aktualisieren.bat` aus der ZIP in den Portal-Ordner kopieren.
+
+Hintergrund-Betrieb von Hand (Eingabeaufforderung als Administrator):
+`schtasks /run /tn "Setup-Engineer Portal"` · `schtasks /end /tn "Setup-Engineer Portal"` · `schtasks /query /tn "Setup-Engineer Portal"`
+
 ## Wo die Daten liegen
 
 Alles im Ordner `portal-data` neben dem Programm (oder dem in `PORTAL_DATA_DIR` angegebenen Ordner):
