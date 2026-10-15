@@ -226,12 +226,13 @@ def recommend(a: SessionAnalysis, history: History | None = None, top: int = 4) 
         score = benefit - HARM_WEIGHT * harm + (INCAR_BONUS if incar else 0.0)
         # Belege: bestätigte NÜTZLICHE Wirkung wertet auf, bestätigte schädliche ab
         for e in ev:
+            w = e.record.weight
             if not e.confirms:
-                score -= 0.5
+                score -= 0.5 * w
             elif e.helpful:
-                score += 0.15
+                score += 0.15 * w
             else:
-                score -= 0.3
+                score -= 0.3 * w
         tested = _already_tested(cand, history, a.ibt.car_name)
         if tested is not None and tested.lap_delta_s is not None and tested.lap_delta_s > 0:
             score -= 0.3

@@ -85,12 +85,14 @@
         <p><b>{{ next_tests[0].car }}:</b> {{ next_tests[0].next_test }}</p>
         <p><a class="arrow-link" href="/meine-daten">Zum Upload</a></p>
       {% elif user and user.consent_at %}
-        <h2>Erste Datei hochladen</h2>
-        <p>Zehn oder mehr saubere Runden im GT3 oder GTP reichen für die erste Auswertung – danach schlägt sie dir einen Test vor.</p>
-        <p><a class="arrow-link" href="/meine-daten">Zum Upload</a></p>
+        <h2>Erste Dateien hochladen</h2>
+        <p>Hast du schon alte GT3- oder GTP-Telemetrie? Lad sie gesammelt hoch – wir suchen die brauchbaren Runs heraus.
+          Danach schlägt dir die Auswertung deinen ersten Test vor.</p>
+        <p><a class="arrow-link" href="/archiv">Altdaten hochladen</a></p>
       {% else %}
         <h2>Leitfaden lesen</h2>
-        <p>Fünf Minuten, dann weißt du, wie ein Test aussieht, der uns allen hilft – und was die Daten wertlos macht.</p>
+        <p>Fünf Minuten, dann weißt du, wie ein Test aussieht, der uns allen hilft. Und deine alte Telemetrie kannst du
+          nach dem Anmelden gleich gesammelt hochladen.</p>
         <p><a class="arrow-link" href="/leitfaden">Zum Leitfaden</a></p>
       {% endif %}
     </article>

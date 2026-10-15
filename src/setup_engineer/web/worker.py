@@ -12,6 +12,9 @@ Pro Upload:
 from __future__ import annotations
 
 import json
+import re
+import uuid
+from datetime import datetime
 import logging
 import threading
 import traceback
@@ -19,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .. import __version__
+from ..classes import car_class
 from ..analysis import analyze_file
 from ..compare import ab_compare, ab_within
 from ..ibt import IbtError
@@ -32,6 +36,9 @@ from .db import Database
 log = logging.getLogger("portal.worker")
 
 QUEUED, RUNNING, DONE, FAILED = "wartet", "läuft", "fertig", "fehler"
+ARCHIVE = "archiv"
+ARCHIVE_MIN_LAPS = 5
+ARCHIVE_PAIR_HOURS = 4  # Altdaten: zwei Sessions gelten als Paar, wenn sie so nah beieinander liegen
 
 
 class Worker:
@@ -95,6 +102,17 @@ class Worker:
                 analysis_version=__version__,
                 next_test=_next_test(rs),
             )
+            archive = row["test_type"] == ARCHIVE
+            if archive:
+                why = None
+                if car_class(a.ibt.car_name) is None:
+                    why = "kein GT3 oder GTP"
+                elif len(a.laps.valid) < ARCHIVE_MIN_LAPS:
+                    why = f"weniger als {ARCHIVE_MIN_LAPS} saubere Runden"
+                if why:
+                    self.db.update_upload(upload_id, status=DONE, **fields)
+                    self.db.exclude_upload(upload_id, f"Archiv: {why}", "automatisch")
+                    return
             # A-B-A innerhalb der Session (im Auto umgestellt)
             within = ab_within(a) if row["test_type"] != "garage" else None
             if within is not None:
@@ -104,12 +122,16 @@ class Worker:
                 ab_path.write_text(ab_text, encoding="utf-8")
                 rec = record_from_ab(r, a, None, within_session=True)
                 rec.file_a = rec.file_b = f"{row['user_id']}/{row['filename']}"
+                if archive:
+                    rec.source = ARCHIVE
                 if self._counts([row]):
                     self._save_test(rec)
                 fields.update(ab_report_path=str(ab_path), ab_summary=_summary(r))
             self.db.update_upload(upload_id, status=DONE, **fields)
             if row["pair_id"]:
                 self._try_pair(row["pair_id"])
+            elif archive and within is None:
+                self._try_archive_pair(upload_id)
         except IbtError as e:
             self.db.update_upload(upload_id, status=FAILED, error=f"Keine gültige iRacing-Telemetrie: {e}")
         except Exception as e:  # noqa: BLE001 – Fehler gehören in die Oberfläche, nicht in den Absturz
@@ -144,6 +166,51 @@ class Worker:
             log.error("Vergleich %s fehlgeschlagen:\n%s", pair_id, traceback.format_exc())
             for m in members:
                 self.db.update_upload(m["id"], error=f"Vergleich fehlgeschlagen ({type(e).__name__}: {e})")
+
+
+    def _try_archive_pair(self, upload_id: str) -> None:
+        """Altdaten: Gibt es eine Session desselben Fahrers mit gleichem Auto und gleicher Strecke kurz davor
+        oder danach, deren Setup sich in GENAU einer Einstellung unterscheidet? Dann ist das ein Garage-Test."""
+        row = self.db.get_upload(upload_id)
+        if not row or row["pair_id"] or not row["session_start"]:
+            return
+        t0 = datetime.fromisoformat(row["session_start"])
+        best, best_gap = None, None
+        for o in self.db.all_uploads(user_id=row["user_id"], status=DONE, excluded="nein", limit=100_000):
+            if o["id"] == row["id"] or o["pair_id"] or o["ab_summary"] or o["test_type"] != ARCHIVE:
+                continue
+            if o["car"] != row["car"] or o["track"] != row["track"] or not o["session_start"]:
+                continue
+            gap = abs((datetime.fromisoformat(o["session_start"]) - t0).total_seconds()) / 3600
+            if gap <= ARCHIVE_PAIR_HOURS and (best_gap is None or gap < best_gap):
+                best, best_gap = o, gap
+        if best is None:
+            return
+        try:
+            x, y = analyze_file(row["stored_path"]), analyze_file(best["stored_path"])
+            (a, ma), (b, mb) = sorted([(x, row), (y, best)], key=lambda p: p[1]["session_start"])
+            r = ab_compare(a, b)
+            if _distinct_changes(r.setup_changes) != 1:
+                return  # keine oder mehrere Änderungen -> kein Test
+            pid = uuid.uuid4().hex
+            ab_path = self.s.reports_dir / f"{pid}-ab.md"
+            ab_path.write_text(ab_markdown(r, ma["filename"], mb["filename"]), encoding="utf-8")
+            rec = record_from_ab(r, a, b)
+            rec.file_a, rec.file_b = f"{ma['user_id']}/{ma['filename']}", f"{mb['user_id']}/{mb['filename']}"
+            rec.source = ARCHIVE
+            if self._counts([ma, mb]):
+                self._save_test(rec)
+            summary = _summary(r)
+            for m in (ma, mb):
+                self.db.update_upload(m["id"], pair_id=pid, ab_report_path=str(ab_path), ab_summary=summary)
+        except Exception:  # noqa: BLE001 – ein Fund weniger, kein Fehler für den Nutzer
+            log.warning("Archiv-Paar %s nicht auswertbar:\n%s", upload_id, traceback.format_exc())
+
+
+def _distinct_changes(changes) -> int:
+    """Zahl der Änderungen; links/rechts gleich verstellt (z. B. beide Vorderfedern) zählt als eine."""
+    keys = {(re.sub(r"(Left|Right)(Front|Rear)", r"\2", c.path), c.before, c.after) for c in changes}
+    return len(keys)
 
 
 def _next_test(rs) -> str | None:

@@ -55,7 +55,7 @@ def build(db, history_path: Path, goal1: int, goal2: int) -> dict:
         c = cars.setdefault(
             r["car"],
             {"car": r["car"], "drivers": set(), "tracks": set(), "sessions": 0, "laps": 0, "tests": set(),
-             "aba": set(), "garage": set(), "topics": {}},
+             "aba": set(), "garage": set(), "archive": set(), "topics": {}},
         )
         c["drivers"].add(r["user_id"])
         if r["track"]:
@@ -64,8 +64,11 @@ def build(db, history_path: Path, goal1: int, goal2: int) -> dict:
         c["laps"] += r["laps_valid"] or 0
         if r["ab_summary"]:
             key = r["pair_id"] or r["id"]
-            c["tests"].add(key)
-            (c["garage"] if r["pair_id"] else c["aba"]).add(key)
+            if r["test_type"] == "archiv":
+                c["archive"].add(key)
+            else:
+                c["tests"].add(key)
+                (c["garage"] if r["pair_id"] else c["aba"]).add(key)
 
     for rec in hist.records:
         c = cars.get(rec.car)
@@ -77,7 +80,8 @@ def build(db, history_path: Path, goal1: int, goal2: int) -> dict:
 
     car_list = []
     for c in cars.values():
-        n = len(c["tests"])
+        # Funde aus Altdaten zählen halb (wie in den Empfehlungen)
+        n = len(c["tests"]) + len(c["archive"]) // 2
         car_list.append(
             {
                 "car": c["car"],
@@ -86,6 +90,8 @@ def build(db, history_path: Path, goal1: int, goal2: int) -> dict:
                 "sessions": c["sessions"],
                 "laps": c["laps"],
                 "tests": n,
+                "planned": len(c["tests"]),
+                "archive": len(c["archive"]),
                 "aba": len(c["aba"]),
                 "garage": len(c["garage"]),
                 "stage": _stage(n, goal1, goal2),
@@ -138,7 +144,8 @@ def build(db, history_path: Path, goal1: int, goal2: int) -> dict:
         "drivers": len({r["user_id"] for r in rows}),
         "sessions": len(rows),
         "laps": sum(r["laps_valid"] or 0 for r in rows),
-        "tests": sum(c["tests"] for c in car_list),
+        "tests": sum(c["planned"] for c in car_list),
+        "archive_tests": sum(c["archive"] for c in car_list),
         "hours": hours,
         "cars": len(car_list),
         "tracks": len({r["track"] for r in rows if r["track"]}),

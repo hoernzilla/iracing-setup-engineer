@@ -87,6 +87,15 @@ Admins (aus `PORTAL_ADMIN_DISCORD_IDS` oder in der Verwaltung ernannt) sehen obe
 
 Öffentlich sind **Das Projekt** (Motivationstext) und **Fortschritt** (Phasen, Tests je Auto, getestete Einstellungen).
 
+## Altdaten (Archiv)
+
+Unter **/archiv** laden Mitglieder alte Telemetrie gesammelt hoch (ohne Leitfaden-Pflicht). Der Browser prüft vorab Auto,
+Klasse und Runden und überträgt nur GT3/GTP mit genug Runden. Alternativ gibt es `Telemetrie-Pruefen.bat` zum Herunterladen
+(reines PowerShell, keine Installation), das passende Dateien auflistet und in `telemetry\Setup-Engineer-Upload` kopiert.
+Der Server wertet: Grunddaten ab 5 sauberen Runden, versteckte Garage-Tests (gleiches Auto/Strecke, ≤ 4 h auseinander,
+genau eine Änderung, links/rechts gleich zählt als eine), Verstellungen im Auto. Archiv-Tests zählen halb.
+Ein- und ausschalten unter Verwaltung → Einstellungen.
+
 ## Test-Leitfaden
 
 Vor dem ersten Upload muss jeder den Leitfaden bis zum Ende durchscrollen und bestätigen; vorher

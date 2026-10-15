@@ -516,3 +516,12 @@ ul.plain.bad li::marker { color: var(--bremse); content: "✕  "; }
 .tile-num b { font-size: 1.3rem; font-stretch: 72%; font-variant-numeric: tabular-nums; }
 .tile-car { display: grid; grid-template-columns: 1fr auto; gap: .2rem .6rem; margin-bottom: .7rem; font-size: .95rem; }
 .tile-car .meter { grid-column: 1 / -1; }
+
+/* ---------------------------------------------------------------- Archiv */
+.archive-hint { margin: 1.2rem 0 0; padding: .9rem 1.2rem; border: 1px dashed var(--gelb); border-radius: var(--radius); }
+.archive-ways { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); margin-top: 2rem; }
+.archive-ways .panel { align-self: start; }
+.archive-pick { display: flex; gap: .7rem; flex-wrap: wrap; margin: 1rem 0 .4rem; }
+.archive-pick .btn { cursor: pointer; }
+#arch-table-wrap { max-height: 26rem; overflow: auto; }
+.submit-row[hidden], .table-scroll[hidden] { display: none; }

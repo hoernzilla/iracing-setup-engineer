@@ -9,7 +9,7 @@
 
   <dl class="kpis">
     <div><dt>Fahrer mit Daten</dt><dd>{{ p.totals.drivers }}<small> von {{ members }} angemeldet</small></dd></div>
-    <div><dt>Tests</dt><dd>{{ p.totals.tests }}</dd></div>
+    <div><dt>Tests</dt><dd>{{ p.totals.tests }}{% if p.totals.archive_tests %}<small> + {{ p.totals.archive_tests }} Archiv</small>{% endif %}</dd></div>
     <div><dt>Sessions</dt><dd>{{ p.totals.sessions }}</dd></div>
     <div><dt>Gewertete Runden</dt><dd>{{ p.totals.laps }}</dd></div>
     <div><dt>Fahrzeit</dt><dd>{{ "%.0f"|format(p.totals.hours) if p.totals.hours >= 10 else "%.1f"|format(p.totals.hours) }}<small> Stunden</small></dd></div>
@@ -32,7 +32,7 @@
   <section class="block">
     <h2>Tests je Auto</h2>
     <p class="fine">Ziel je Auto: {{ p.goal1 }} Tests für Stufe 1 (Richtung der Wirkung abgesichert), {{ p.goal2 }} für Stufe 2 (Stärke der Wirkung).
-      Ein Test ist ein A-B-A im Auto oder ein Garage-Paar.</p>
+      Ein Test ist ein A-B-A im Auto oder ein Garage-Paar. Tests, die in Altdaten gefunden wurden, zählen halb.</p>
     {% if p.cars %}
       <div class="car-grid">
       {% for c in p.cars %}
@@ -42,6 +42,7 @@
             <span class="stage stage-{{ c.stage.n }}">{{ c.stage.label }}</span>
           </header>
           <p class="car-count"><b>{{ c.tests }}</b> von {{ p.goal2 }} Tests
+            {% if c.archive %}<span class="dim">({{ c.planned }} geplant + {{ c.archive }} aus dem Archiv, halb gezählt)</span>{% endif %}
             {% if c.stage.missing %}<span class="dim">· noch {{ c.stage.missing }} bis Stufe {{ c.stage.n }}</span>{% endif %}</p>
           <div class="meter big" role="img" aria-label="{{ c.tests }} von {{ p.goal2 }} Tests, Stufe 1 bei {{ p.goal1 }}">
             <span class="meter-fill" style="width: {{ c.pct2 }}%"></span>

@@ -409,6 +409,43 @@ class TestPortal(unittest.TestCase):
         self.assertIn("Erst der Leitfaden", admin.req("/meine-daten")[2])
         admin.form("/leitfaden/bestaetigen", {"csrf": acsrf, "gelesen": "ja"})
 
+    def test_12_archive(self) -> None:
+        b, csrf = self.member()
+        status, _, html = b.req("/archiv")
+        self.assertEqual(status, 200)
+        self.assertIn("Altdaten hochladen", html)
+        status, headers, body = b.req("/download/telemetrie-pruefen")
+        self.assertEqual(status, 200)
+        self.assertIn("Read-Ibt", body)
+        tmp = Path(self.tmp.name)
+        a = make_file(tmp / "arch_a.ibt", SynthConfig(seed=51, laps=8)).read_bytes()
+        bb = make_file(tmp / "arch_b.ibt", SynthConfig(seed=52, laps=8, spring_front="200 N/mm")).read_bytes()
+        short = make_file(tmp / "arch_kurz.ibt", SynthConfig(seed=53, laps=3)).read_bytes()
+        ids = []
+        for name, data in (("alt_a.ibt", a), ("alt_b.ibt", bb), ("alt_kurz.ibt", short)):
+            body = b.req("/api/upload?art=archiv", *self._multipart([(name, data)], {"test_type": "archiv"}, csrf))[2]
+            ids.append(json.loads(body)["items"][0]["id"])
+        self.wait_done(b, ids)
+        for _ in range(60):
+            hist = json.loads(self.settings.history_path.read_text(encoding="utf-8"))
+            if any(r.get("source") == "archiv" and "alt_a.ibt" in r["file_a"] + r["file_b"] for r in hist):
+                break
+            time.sleep(0.3)
+        self.assertTrue(any(r.get("source") == "archiv" for r in hist), "versteckter Garage-Test nicht gefunden")
+        _, _, html = b.req("/archiv")
+        self.assertIn("weniger als 5 saubere Runden", html)
+        _, _, html = Browser(self.base).req("/fortschritt")
+        self.assertIn("Archiv", html)
+
+    def _multipart(self, files, fields, csrf):
+        boundary = uuid.uuid4().hex
+        parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in fields.items()]
+        for name, content in files:
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="files"; filename="{name}"\r\n'
+                         f"Content-Type: application/octet-stream\r\n\r\n".encode() + content + b"\r\n")
+        body = b"".join(parts) + f"--{boundary}--\r\n".encode()
+        return body, {"Content-Type": f"multipart/form-data; boundary={boundary}", "X-CSRF-Token": csrf}
+
     def test_09_report_escaping(self) -> None:
         html = safe_report_html("| a | b |\n| --- | --- |\n| <script>alert(1)</script> | [x](javascript:alert(1)) |\n\n![i](http://x/y.png)")
         self.assertNotIn("<script>", html)

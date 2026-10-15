@@ -14,6 +14,7 @@
         <textarea name="announcement" rows="2" maxlength="600" placeholder="Erscheint als Hinweis oben auf jeder Seite. Leer = keine Ankündigung.">{{ announcement }}</textarea>
       </label>
       <label class="check"><input type="checkbox" name="paused" value="1" {% if paused %}checked{% endif %}> <span>Uploads pausieren (Admins können weiter hochladen)</span></label>
+      <label class="check"><input type="checkbox" name="archive_open" value="1" {% if archive_is_open %}checked{% endif %}> <span>Archiv-Upload für Altdaten geöffnet</span></label>
       <label><span>Hinweis während der Pause</span>
         <input type="text" name="pause_message" maxlength="300" value="{{ pause_message }}" placeholder="z. B. Wartung bis Sonntagabend">
       </label>

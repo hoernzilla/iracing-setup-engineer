@@ -9,6 +9,7 @@
       {% if guidelines_renewed %}Der Leitfaden wurde überarbeitet. Bitte lies ihn noch einmal und bestätige ihn.
       {% else %}Damit eure Daten etwas wert sind, lies bitte einmal, wie wir uns die Tests vorstellen. Danach ist der Upload frei.{% endif %}
     </p>
+    <p class="fine">Nur alte Telemetrie abgeben? Das geht auch ohne Leitfaden: <a href="/archiv">Altdaten hochladen</a>.</p>
     <div class="gate-scroll" id="gate-scroll" tabindex="0" aria-label="Test-Leitfaden">
       {% include "_leitfaden.html" %}
       <p class="gate-end" id="gate-end">Ende des Leitfadens.</p>
@@ -42,6 +43,11 @@
     <p class="fine">Vorschlag aus deiner letzten Auswertung. Ablauf: <a href="/leitfaden#aba">A-B-A im Auto</a> oder <a href="/leitfaden#garage">Garage-Test</a>.</p>
   </aside>
   {% endif %}
+
+  <aside class="archive-hint">
+    <b>Schon alte Telemetrie auf der Platte?</b> Lad sie gesammelt hoch – wir suchen die brauchbaren GT3- und GTP-Runs heraus,
+    auch Setup-Vergleiche, die du nie als Test geplant hast. <a class="arrow-link" href="/archiv">Altdaten hochladen</a>
+  </aside>
 
   {% if not paused %}
   <form id="upload-form" class="upload" novalidate>

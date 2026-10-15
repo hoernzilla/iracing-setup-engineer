@@ -27,10 +27,18 @@ class TestRecord:
     conditions_differ: bool
     within_session: bool = False
     notes: list[str] = field(default_factory=list)
+    source: str = "test"  # "test" = nach Leitfaden gefahren, "archiv" = aus alten Dateien gefunden
+
+    @property
+    def weight(self) -> float:
+        """Gewicht als Beleg: Funde aus Altdaten zählen halb."""
+        return 0.5 if self.source == "archiv" else 1.0
 
     @property
     def quality(self) -> str:
         """Wie belastbar ist die Messung?"""
+        if self.source == "archiv":
+            return "Archiv, nicht geplant – halbes Gewicht"
         if self.within_session:
             return "hoch, gleiche Session"
         return "eingeschränkt, Bedingungen verschieden" if self.conditions_differ else "mittel, getrennte Runs"

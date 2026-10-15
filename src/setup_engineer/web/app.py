@@ -24,6 +24,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from .. import __version__
+from ..classes import GT3_EXCLUDE, GT3_MARKER, GTP_MARKERS
 from ..ibt import IbtError, IbtFile
 from ..recommend.history import History
 from . import discord, progress
@@ -38,6 +39,7 @@ TEST_TYPES = {
     "normal": "Normale Runs",
     "aba": "A-B-A-Test im Auto",
     "garage": "Garage-Test (zwei Runs)",
+    "archiv": "Archiv (Altdaten)",
 }
 # Bei inhaltlichen Änderungen am Leitfaden erhöhen -> alle bestätigen neu
 GUIDELINES_VERSION = "2026-10-15"
@@ -318,6 +320,42 @@ def create_app(settings: Settings | None = None) -> Starlette:
             pause_message=db.get_setting("pause_message"),
         )
 
+    def archive_open(user: dict | None) -> bool:
+        return db.get_setting("archive_open", "1") == "1" or is_admin(user)
+
+    async def archive_page(request: Request) -> Response:
+        user = require_user(request)
+        if isinstance(user, Response):
+            return user
+        rows = [r for r in db.uploads_for_user(user["discord_id"]) if r["test_type"] == "archiv"]
+        tests = {r["pair_id"] or r["id"] for r in rows if r["ab_summary"] and not r["excluded_at"]}
+        stats = {
+            "files": len(rows),
+            "used": sum(1 for r in rows if r["status"] == DONE and not r["excluded_at"]),
+            "skipped": sum(1 for r in rows if r["excluded_at"]),
+            "running": sum(1 for r in rows if r["status"] in (QUEUED, "läuft")),
+            "tests": len(tests),
+        }
+        reasons: dict[str, int] = {}
+        for r in rows:
+            if r["excluded_at"]:
+                key = (r["excluded_reason"] or "aussortiert").removeprefix("Archiv: ")
+                reasons[key] = reasons.get(key, 0) + 1
+        return render(
+            request,
+            "archiv.html",
+            open=archive_open(user),
+            paused=uploads_paused(user),
+            stats=stats,
+            reasons=sorted(reasons.items(), key=lambda x: -x[1]),
+            markers={"gtp": list(GTP_MARKERS), "gt3": GT3_MARKER, "gt3_exclude": list(GT3_EXCLUDE)},
+        )
+
+    async def download_script(request: Request) -> Response:
+        data = (HERE / "static" / "Telemetrie-Pruefen.bat").read_bytes()
+        return Response(data, media_type="application/octet-stream",
+                        headers={"Content-Disposition": 'attachment; filename="Telemetrie-Pruefen.bat"'})
+
     def uploads_paused(user: dict | None) -> bool:
         return db.get_setting("uploads_paused") == "1" and not is_admin(user)
 
@@ -463,6 +501,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             announcement=db.get_setting("announcement"),
             paused=db.get_setting("uploads_paused") == "1",
             pause_message=db.get_setting("pause_message"),
+            archive_is_open=db.get_setting("archive_open", "1") == "1",
             guide_version=guidelines_version(),
             guide_confirmed=sum(1 for p in db.users_with_stats() if p.get("guidelines_version") == guidelines_version()),
             owners=sorted(s.admin_discord_ids),
@@ -517,6 +556,10 @@ def create_app(settings: Settings | None = None) -> Starlette:
         if action == "einstellungen":
             ann = str(form.get("announcement") or "").strip()[:600]
             paused = form.get("paused") == "1"
+            arch = form.get("archive_open") == "1"
+            if arch != (db.get_setting("archive_open", "1") == "1"):
+                db.log(admin_user, "Archiv-Upload " + ("geöffnet" if arch else "geschlossen"))
+            db.set_setting("archive_open", "1" if arch else "0")
             note = str(form.get("pause_message") or "").strip()[:300]
             changes = []
             if ann != db.get_setting("announcement"):
@@ -655,7 +698,10 @@ def create_app(settings: Settings | None = None) -> Starlette:
             return await reject(request, "Sitzung abgelaufen – bitte die Seite neu laden.", 400)
         if is_banned(user):
             return await reject(request, "Dein Zugang ist gesperrt.", 403)
-        if not guidelines_ok(user):
+        is_archive = request.query_params.get("art") == "archiv"
+        if is_archive and not archive_open(user):
+            return await reject(request, "Der Archiv-Upload ist gerade geschlossen.", 403)
+        if not is_archive and not guidelines_ok(user):
             return await reject(request, "Bitte zuerst den Test-Leitfaden lesen und bestätigen.", 403)
         if uploads_paused(user):
             note = db.get_setting("pause_message")
@@ -668,8 +714,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
         form = await request.form(max_files=s.max_files_per_upload, max_fields=20)
         files = [f for f in form.getlist("files") if hasattr(f, "filename") and f.filename]
         test_type = str(form.get("test_type") or "normal")
-        if test_type not in TEST_TYPES:
-            test_type = "normal"
+        if test_type not in TEST_TYPES or (test_type == "archiv") != is_archive:
+            test_type = "archiv" if is_archive else "normal"
         description = str(form.get("description") or "")[:1000]
         feeling = str(form.get("feeling") or "")[:1000]
         if not files:
@@ -770,6 +816,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
         Route("/bericht/{upload_id}/{kind}", report),
         Route("/upload/{upload_id}/loeschen", delete_upload, methods=["POST"]),
         Route("/projekt", project),
+        Route("/archiv", archive_page),
+        Route("/download/telemetrie-pruefen", download_script),
         Route("/fortschritt", progress_page),
         Route("/admin", admin_home),
         Route("/admin/teilnehmer", admin_people),
