@@ -235,11 +235,15 @@ def session_markdown(a: SessionAnalysis) -> str:
 
     # Setup
     if len(a.setup):
-        L.append("## Setup\n")
-        L.append("| Parameter | Wert |")
-        L.append("| --- | --- |")
+        L.append("## Gefahrenes Setup (aus der Datei, kein Vorschlag)\n")
+        L.append(
+            "So war das Auto in dieser Session eingestellt. Werte mit „Anzeige“ sind von iRacing berechnet "
+            "und nicht direkt einstellbar.\n"
+        )
+        L.append("| Parameter | Wert | |")
+        L.append("| --- | --- | --- |")
         for path, v in a.setup.values.items():
-            L.append(f"| {path} | {v.raw} |")
+            L.append(f"| {path} | {v.raw} | {'Anzeige' if v.likely_read_only else ''} |")
         L.append("")
     return "\n".join(L)
 
