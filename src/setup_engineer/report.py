@@ -255,8 +255,27 @@ def ab_markdown(r: ABResult, name_a: str, name_b: str) -> str:
     L.append(f"- p-Wert: {_f(r.p_value, 3)} → **{r.verdict}**")
     if r.covariates:
         L.append(f"- Herausgerechnet: {', '.join(r.covariates)}")
+    if r.lap_sd_s is not None:
+        L.append(f"- Rundenstreuung (Konstanz): ±{r.lap_sd_s:.3f} s")
     if r.laps_needed and r.verdict == "nicht entscheidbar":
         L.append(f"- Für ein klares Ergebnis bei diesem Effekt: ca. {r.laps_needed} Runden je Variante")
+    for n in r.notes:
+        L.append(f"- Hinweis: {n}")
+    if r.conditions:
+        L.append("\n## Bedingungen\n")
+        L.append("| | A | B | |")
+        L.append("| --- | --- | --- | --- |")
+        for c in r.conditions:
+            L.append(f"| {c.name} ({c.unit}) | {c.a:.4g} | {c.b:.4g} | {'⚠ verschieden' if c.warn else ''} |")
+    if r.sections:
+        L.append("\n## Wo liegt die Zeit? (Median je Abschnitt)\n")
+        L.append("| Abschnitt | A (s) | B (s) | B − A (s) |")
+        L.append("| --- | --- | --- | --- |")
+        for s in r.sections:
+            L.append(f"| {s.section} | {s.time_a:.3f} | {s.time_b:.3f} | {s.delta:+.3f} |")
+        total = sum(s.delta for s in r.sections)
+        L.append(f"| **Summe** | | | **{total:+.3f}** |")
+        L.append("\nAbschnitt = vom Bremspunkt einer Kurve bis zum Bremspunkt der nächsten. Summe der Mediane ≈ Rundendifferenz.")
     L.append("\n## Setup-Unterschiede\n")
     if not r.setup_changes:
         L.append("Keine Unterschiede gefunden.")

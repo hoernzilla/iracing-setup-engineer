@@ -189,5 +189,23 @@ class TestRealGTP(unittest.TestCase):
         self.assertNotIn("LFtempL", self.a.tires.pit_only)
 
 
+REAL_GTP2 = REAL_GTP.with_name("gtp2.ibt")
+
+
+@unittest.skipUnless(REAL_GTP.exists() and REAL_GTP2.exists(), "echte GTP-Dateien nicht vorhanden")
+class TestRealGTPRepeat(unittest.TestCase):
+    """Zwei Runs mit identischem Setup. Früher kippte das Modell, weil die
+    Streckentemperatur pro Run konstant war (Ergebnis: angeblich 2,7 s schneller)."""
+
+    def test_confounded_temperature_not_used(self) -> None:
+        r = ab_compare(analyze_file(REAL_GTP), analyze_file(REAL_GTP2))
+        self.assertNotIn("Streckentemperatur", r.covariates)
+        self.assertGreater(r.effect_s, 0)  # B war im Schnitt langsamer
+        self.assertLess(abs(r.effect_s - (r.mean_b - r.mean_a)), 0.3)
+        self.assertEqual(r.setup_changes, [])
+        self.assertTrue(any(c.name == "Luftdichte" and c.warn for c in r.conditions))
+        self.assertAlmostEqual(sum(s.delta for s in r.sections), r.mean_b - r.mean_a, delta=0.4)
+
+
 if __name__ == "__main__":
     unittest.main()
