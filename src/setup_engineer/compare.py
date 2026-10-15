@@ -37,6 +37,7 @@ class ABResult:
     sections: list["SectionDelta"] = field(default_factory=list)
     conditions: list["Condition"] = field(default_factory=list)
     balance: list["BalanceDelta"] = field(default_factory=list)
+    detail: object | None = None  # compare_detail.ABDetail
 
 
 @dataclass
@@ -257,7 +258,7 @@ def ab_compare(a: SessionAnalysis, b: SessionAnalysis) -> ABResult:
     if abs(effect) > 1e-3 and sd > 0:
         needed = int(np.ceil(2 * ((1.96 + 0.84) * sd / abs(effect)) ** 2))
 
-    return ABResult(
+    result = ABResult(
         laps_a=len(la),
         laps_b=len(lb),
         mean_a=float(np.mean([lap.time_s for lap in la])),
@@ -275,3 +276,7 @@ def ab_compare(a: SessionAnalysis, b: SessionAnalysis) -> ABResult:
         conditions=conds,
         balance=balance_deltas(a, b),
     )
+    from .compare_detail import build_detail
+
+    result.detail = build_detail(result, a, b)
+    return result

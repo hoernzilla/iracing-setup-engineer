@@ -208,6 +208,13 @@ class TestRealGTPRepeat(unittest.TestCase):
             [("Im Auto: Stabilisator vorne", "1", "3")],
         )
         self.assertTrue(any(c.name == "Luftdichte" and c.warn for c in r.conditions))
+        # Ausführlicher Bericht mit Fazit
+        d = r.detail
+        self.assertEqual(len(d.laps_a), 12)
+        self.assertTrue(d.corner_speeds and d.platform and d.tires)
+        text = " ".join(d.conclusions)
+        self.assertIn("erwarteten Wirkung", text)
+        self.assertIn("Luftdichte", text)
         self.assertAlmostEqual(sum(s.delta for s in r.sections), r.mean_b - r.mean_a, delta=0.4)
 
 

@@ -276,48 +276,116 @@ def session_markdown(a: SessionAnalysis) -> str:
     return "\n".join(L)
 
 
+def _pair_table(title: str, pairs, intro: str = "") -> list[str]:
+    if not pairs:
+        return []
+    L = [f"## {title}\n"]
+    if intro:
+        L.append(intro + "\n")
+    L.append("| | A | B | B − A |")
+    L.append("| --- | --- | --- | --- |")
+    for p in pairs:
+        unit = f" {p.unit}" if p.unit else ""
+        d = p.delta
+        if p.unit == "s" and p.a is not None and p.b is not None and max(p.a, p.b) >= 60:
+            va, vb = _fmt_time(p.a), _fmt_time(p.b)  # Rundenzeiten als m:ss.sss
+        else:
+            va, vb = f"{_f(p.a, p.digits)}{unit}", f"{_f(p.b, p.digits)}{unit}"
+        dunit = " Pkt." if p.unit == "%" else unit  # Differenz von Prozentwerten = Prozentpunkte
+        L.append(
+            f"| {p.label} | {va} | {vb} | "
+            f"{'–' if d is None else f'{d:+.{p.digits}f}'}{dunit if d is not None else ''} |"
+        )
+    L.append("")
+    return L
+
+
 def ab_markdown(r: ABResult, name_a: str, name_b: str) -> str:
-    L = [f"# A/B-Vergleich\n", f"- A: `{name_a}` ({r.laps_a} gültige Runden, Ø {_fmt_time(r.mean_a)})"]
-    L.append(f"- B: `{name_b}` ({r.laps_b} gültige Runden, Ø {_fmt_time(r.mean_b)})")
-    L.append(f"- Effekt B − A (bereinigt): **{_f(r.effect_s, 3, ' s')}**, 95-%-Intervall {_f(r.ci95_s[0], 3)} … {_f(r.ci95_s[1], 3)} s")
-    L.append(f"- p-Wert: {_f(r.p_value, 3)} → **{r.verdict}**")
-    if r.covariates:
-        L.append(f"- Herausgerechnet: {', '.join(r.covariates)}")
-    if r.lap_sd_s is not None:
-        L.append(f"- Rundenstreuung (Konstanz): ±{r.lap_sd_s:.3f} s")
-    if r.laps_needed and r.verdict == "nicht entscheidbar":
-        L.append(f"- Für ein klares Ergebnis bei diesem Effekt: ca. {r.laps_needed} Runden je Variante")
-    for n in r.notes:
-        L.append(f"- Hinweis: {n}")
+    d = r.detail
+    L = ["# A/B-Vergleich\n"]
+    L.append(f"- **A:** `{name_a}`")
+    L.append(f"- **B:** `{name_b}`\n")
+
+    if d is not None and d.conclusions:
+        L.append("## Fazit\n")
+        L += [f"{i}. {c}" for i, c in enumerate(d.conclusions, 1)]
+        L.append("")
+
+    if d is not None:
+        L += _pair_table("Überblick", d.overview)
+    L.append("## Setup-Unterschiede\n")
+    if not r.setup_changes:
+        L.append("Keine Unterschiede gefunden – weder im Garage-Setup noch bei Verstellungen im Auto.\n")
+    else:
+        L.append("| Parameter | A | B | Δ |")
+        L.append("| --- | --- | --- | --- |")
+        for c in r.setup_changes:
+            L.append(f"| {c.path} | {c.before or '–'} | {c.after or '–'} | {_f(c.delta, 3) if c.delta is not None else '–'} |")
+        L.append("\n„Im Auto“ = während der Fahrt verstellt (im Garage-Setup der Datei nicht sichtbar).\n")
+
     if r.conditions:
-        L.append("\n## Bedingungen\n")
+        L.append("## Bedingungen\n")
         L.append("| | A | B | |")
         L.append("| --- | --- | --- | --- |")
         for c in r.conditions:
             L.append(f"| {c.name} ({c.unit}) | {c.a:.4g} | {c.b:.4g} | {'⚠ verschieden' if c.warn else ''} |")
+        L.append("")
+
+    if d is not None:
+        L.append("## Rundenzeiten\n")
+        n = max(len(d.laps_a), len(d.laps_b))
+        L.append("| Runde | A | Status A | B | Status B |")
+        L.append("| --- | --- | --- | --- | --- |")
+        for i in range(n):
+            ra = d.laps_a[i] if i < len(d.laps_a) else None
+            rb = d.laps_b[i] if i < len(d.laps_b) else None
+            no = (ra or rb).number
+            L.append(
+                f"| {no} | {_fmt_time(ra.time_s) if ra else ''} | {ra.status if ra else ''} | "
+                f"{_fmt_time(rb.time_s) if rb else ''} | {rb.status if rb else ''} |"
+            )
+        L.append("")
+
     if r.balance:
-        L.append("\n## Balance A vs. B (Lenküberschuss, + = Untersteuern)\n")
+        L.append("## Balance (Lenküberschuss, + = Untersteuern)\n")
         L.append("| Bereich | A | B | Veränderung |")
         L.append("| --- | --- | --- | --- |")
         for x in r.balance:
             L.append(f"| {x.zone} | {x.a * 100:+.0f} % | {x.b * 100:+.0f} % | {(x.b - x.a) * 100:+.0f} Pkt. |")
+        L.append("")
+
     if r.sections:
-        L.append("\n## Wo liegt die Zeit? (Median je Abschnitt)\n")
+        L.append("## Wo liegt die Zeit? (Median je Abschnitt)\n")
         L.append("| Abschnitt | A (s) | B (s) | B − A (s) |")
         L.append("| --- | --- | --- | --- |")
         for s in r.sections:
             L.append(f"| {s.section} | {s.time_a:.3f} | {s.time_b:.3f} | {s.delta:+.3f} |")
         total = sum(s.delta for s in r.sections)
         L.append(f"| **Summe** | | | **{total:+.3f}** |")
-        L.append("\nAbschnitt = vom Bremspunkt einer Kurve bis zum Bremspunkt der nächsten. Summe der Mediane ≈ Rundendifferenz.")
-    L.append("\n## Setup-Unterschiede\n")
-    if not r.setup_changes:
-        L.append("Keine Unterschiede gefunden.")
-    else:
-        L.append("| Parameter | A | B | Δ |")
-        L.append("| --- | --- | --- | --- |")
-        for c in r.setup_changes:
-            L.append(f"| {c.path} | {c.before or '–'} | {c.after or '–'} | {_f(c.delta, 3) if c.delta is not None else '–'} |")
+        L.append("\nAbschnitt = vom Bremspunkt einer Kurve bis zum Bremspunkt der nächsten.\n")
+
+    if d is not None:
+        L += _pair_table("Kurventempo im Scheitel", d.corner_speeds, "Median der gewerteten Runden.")
+        L += _pair_table("Plattform", d.platform)
+        L += _pair_table("Reifen", d.tires, "Werte der letzten gewerteten Runde.")
+        L += _pair_table(
+            "Traktion und Blockieren",
+            d.traction,
+            "Anteil der Zeit mit Durchdrehen (Ausgang) bzw. blockierendem Rad (Bremsen); nur Kurven mit messbaren Werten.",
+        )
+        L += _pair_table("Fahrstil", d.style)
+
+    L.append("## Statistik\n")
+    L.append(f"- Gewertete Runden: A {r.laps_a}, B {r.laps_b}")
+    L.append(f"- Effekt B − A (bereinigt): {_f(r.effect_s, 3, ' s')}, 95-%-Intervall {_f(r.ci95_s[0], 3)} … {_f(r.ci95_s[1], 3)} s")
+    L.append(f"- p-Wert: {_f(r.p_value, 3)} → {r.verdict}")
+    L.append(f"- Herausgerechnet: {', '.join(r.covariates) if r.covariates else 'nichts'}")
+    if r.lap_sd_s is not None:
+        L.append(f"- Rundenstreuung (Konstanz): ±{r.lap_sd_s:.3f} s")
+    if r.laps_needed and r.verdict == "nicht entscheidbar":
+        L.append(f"- Für ein klares Ergebnis bei diesem Effekt: ca. {r.laps_needed} Runden je Variante")
+    for note in r.notes:
+        L.append(f"- {note}")
     return "\n".join(L) + "\n"
 
 
