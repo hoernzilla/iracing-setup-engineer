@@ -6,7 +6,11 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
     "pyyaml>=6.0",
+    "scipy>=1.11",
 ]
+
+[project.scripts]
+setup-engineer = "setup_engineer.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
