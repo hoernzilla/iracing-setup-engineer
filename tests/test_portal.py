@@ -440,6 +440,49 @@ class TestPortal(unittest.TestCase):
         _, _, html = Browser(self.base).req("/fortschritt")
         self.assertIn("Archiv", html)
 
+    def test_13_retention(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from setup_engineer.web import retention
+        from setup_engineer.web.db import Database
+
+        b, csrf = self.member()
+        noaba = make_file(Path(self.tmp.name) / "noaba.ibt", SynthConfig(seed=61, laps=8)).read_bytes()
+        status, body = b.upload([("ohne_umstellung.ibt", noaba)], {"test_type": "aba"}, csrf)
+        open_id = body["items"][0]["id"]
+        self.wait_done(b, [open_id])
+        db = Database(self.settings.db_path)
+        _, _, dash = b.req("/meine-daten")
+        self.assertIn("Warum wir deine Dateien nur 14 Tage aufheben", dash)
+        self.assertIn("keine Umstellung im Auto erkannt", dash)
+        hist_before = self.settings.history_path.read_text(encoding="utf-8")
+        # 15 Tage später: komplette weg, unvollständige bleibt
+        res = retention.run(db, now=datetime.now(timezone.utc) + timedelta(days=15))
+        self.assertGreater(res["removed"], 0)
+        rows = {r["id"]: r for r in db.all_uploads(limit=10000)}
+        self.assertIsNone(rows[open_id]["raw_deleted_at"])
+        gone = [r for r in rows.values() if r["raw_deleted_at"]]
+        self.assertTrue(all(not Path(r["stored_path"]).exists() for r in gone))
+        self.assertEqual(self.settings.history_path.read_text(encoding="utf-8"), hist_before)  # Wissen bleibt
+        done = next(r for r in gone if r["user_id"] == MEMBER["id"] and r["status"] == "fertig")
+        self.assertEqual(b.req(f"/bericht/{done['id']}")[0], 200)  # Auswertung bleibt lesbar
+        # Speichergrenze überschritten -> Frist, Hinweis beim Fahrer, nach Frist weg
+        orig = retention.config
+        retention.config = lambda d: {**orig(d), "limit_gb": 0}
+        try:
+            res = retention.run(db)
+            self.assertGreaterEqual(res["flagged"], 1)
+            self.assertIn("noch nicht vollständig", b.req("/meine-daten")[2])
+            retention.run(db, now=datetime.now(timezone.utc) + timedelta(days=31))
+        finally:
+            retention.config = orig
+        self.assertIsNotNone(db.get_upload(open_id)["raw_deleted_at"])
+        # Neu auswerten geht ohne Rohdatei nicht – Ergebnis bleibt
+        _, _, html = b.req("/admin/einstellungen")
+        status, _, html = b.form("/admin/aktion", {"csrf": csrf_from(html), "action": "neu_auswerten", "upload_id": done["id"]})
+        self.assertEqual(status, 400)
+        self.assertIn("Speicher und Aufbewahrung", b.req("/admin/einstellungen")[2])
+
     def _multipart(self, files, fields, csrf):
         boundary = uuid.uuid4().hex
         parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in fields.items()]

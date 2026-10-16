@@ -8,7 +8,7 @@
     <tbody>
     {% for u in uploads %}
       <tr class="{% if u.excluded_at %}is-excluded{% endif %}">
-        <td>{{ u.uploaded_at | datum }}<span class="sub">{{ u.filename }}</span></td>
+        <td>{{ u.uploaded_at | datum }}<span class="sub">{{ u.filename }}</span>{% if u.raw_deleted_at %}<span class="sub">Rohdatei entfernt {{ u.raw_deleted_at | datum }}</span>{% elif u.delete_after %}<span class="sub">Löschfrist {{ u.delete_after | datum }}</span>{% endif %}</td>
         {% if show_user %}<td><a href="/admin/teilnehmer/{{ u.user_id }}">{{ u.display_name or u.username or u.user_id }}</a>{% if u.banned_at %} <span class="state state-fehler">gesperrt</span>{% endif %}</td>{% endif %}
         <td>{{ u.car or "–" }}<span class="sub">{{ u.track or "" }}</span></td>
         <td class="num">{% if u.laps_valid is not none %}{{ u.laps_valid }}<span class="dim">/{{ u.laps_total }}</span>{% else %}–{% endif %}</td>

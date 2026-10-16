@@ -9,9 +9,10 @@
   <dl class="kpis">
     <div><dt>Teilnehmer</dt><dd>{{ stats.users }}<small> · {{ stats.active7 }} aktiv in 7 Tagen</small></dd></div>
     <div><dt>Gesperrt</dt><dd>{{ stats.banned }}</dd></div>
-    <div><dt>Uploads</dt><dd>{{ stats.uploads }}<small> · {{ "%.1f"|format(stats.bytes / 1073741824) }} GB</small></dd></div>
+    <div><dt>Uploads</dt><dd>{{ stats.uploads }}</dd></div>
     <div><dt>Tests gewertet</dt><dd>{{ totals.tests }}</dd></div>
     <div><dt>Aussortiert</dt><dd>{{ stats.excluded }}</dd></div>
+    <div><dt>Rohdateien</dt><dd>{{ "%.1f"|format(store.raw_gb) }}<small> GB{% if store.free_gb is not none %} · {{ "%.0f"|format(store.free_gb) }} GB frei{% endif %}</small></dd></div>
     <div><dt>In Arbeit / Fehler</dt><dd>{{ stats.queued }}<small> / {{ stats.failed }}</small></dd></div>
   </dl>
 

@@ -31,7 +31,7 @@ from ..recommend.history import History, record_from_ab
 from ..recommend.report import recommend_markdown
 from ..report import ab_markdown, session_markdown
 from .config import Settings
-from .db import Database
+from .db import Database, now
 
 log = logging.getLogger("portal.worker")
 
@@ -110,7 +110,7 @@ class Worker:
                 elif len(a.laps.valid) < ARCHIVE_MIN_LAPS:
                     why = f"weniger als {ARCHIVE_MIN_LAPS} saubere Runden"
                 if why:
-                    self.db.update_upload(upload_id, status=DONE, **fields)
+                    self.db.update_upload(upload_id, status=DONE, done_at=now(), **fields)
                     self.db.exclude_upload(upload_id, f"Archiv: {why}", "automatisch")
                     return
             # A-B-A innerhalb der Session (im Auto umgestellt)
@@ -127,7 +127,7 @@ class Worker:
                 if self._counts([row]):
                     self._save_test(rec)
                 fields.update(ab_report_path=str(ab_path), ab_summary=_summary(r))
-            self.db.update_upload(upload_id, status=DONE, **fields)
+            self.db.update_upload(upload_id, status=DONE, done_at=now(), **fields)
             if row["pair_id"]:
                 self._try_pair(row["pair_id"])
             elif archive and within is None:
@@ -161,7 +161,7 @@ class Worker:
                 self._save_test(rec)
             summary = _summary(r)
             for m in members:
-                self.db.update_upload(m["id"], ab_report_path=str(ab_path), ab_summary=summary)
+                self.db.update_upload(m["id"], ab_report_path=str(ab_path), ab_summary=summary, done_at=now())
         except Exception as e:  # noqa: BLE001
             log.error("Vergleich %s fehlgeschlagen:\n%s", pair_id, traceback.format_exc())
             for m in members:
@@ -177,7 +177,7 @@ class Worker:
         t0 = datetime.fromisoformat(row["session_start"])
         best, best_gap = None, None
         for o in self.db.all_uploads(user_id=row["user_id"], status=DONE, excluded="nein", limit=100_000):
-            if o["id"] == row["id"] or o["pair_id"] or o["ab_summary"] or o["test_type"] != ARCHIVE:
+            if o["id"] == row["id"] or o["pair_id"] or o["ab_summary"] or o["test_type"] != ARCHIVE or o["raw_deleted_at"]:
                 continue
             if o["car"] != row["car"] or o["track"] != row["track"] or not o["session_start"]:
                 continue
@@ -202,7 +202,7 @@ class Worker:
                 self._save_test(rec)
             summary = _summary(r)
             for m in (ma, mb):
-                self.db.update_upload(m["id"], pair_id=pid, ab_report_path=str(ab_path), ab_summary=summary)
+                self.db.update_upload(m["id"], pair_id=pid, ab_report_path=str(ab_path), ab_summary=summary, done_at=now())
         except Exception:  # noqa: BLE001 – ein Fund weniger, kein Fehler für den Nutzer
             log.warning("Archiv-Paar %s nicht auswertbar:\n%s", upload_id, traceback.format_exc())
 

@@ -96,6 +96,15 @@ Der Server wertet: Grunddaten ab 5 sauberen Runden, versteckte Garage-Tests (gle
 genau eine Änderung, links/rechts gleich zählt als eine), Verstellungen im Auto. Archiv-Tests zählen halb.
 Ein- und ausschalten unter Verwaltung → Einstellungen.
 
+## Speicher und Aufbewahrung
+
+Gespeichert bleiben immer: Testergebnisse (`community-history.json`), Berichte, Datenbank. Die `.ibt`-Rohdateien werden
+stündlich aufgeräumt (Verwaltung → Einstellungen → Speicher und Aufbewahrung):
+- komplett ausgewertet (Grunddaten, Archiv, Tests mit Vergleich, aussortierte): Rohdatei nach 14 Tagen weg,
+- unvollständige Tests: bleiben, bis sie zusammen mehr als 60 GB belegen; dann 30 Tage Frist, der Fahrer sieht einen roten Hinweis.
+Optional ein Sicherungsordner: Dateien werden dorthin verschoben statt gelöscht. Ohne Rohdatei ist keine Neuauswertung möglich,
+die bisherigen Ergebnisse bleiben aber erhalten.
+
 ## Test-Leitfaden
 
 Vor dem ersten Upload muss jeder den Leitfaden bis zum Ende durchscrollen und bestätigen; vorher

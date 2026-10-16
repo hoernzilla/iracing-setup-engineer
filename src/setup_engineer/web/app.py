@@ -27,7 +27,7 @@ from .. import __version__
 from ..classes import GT3_EXCLUDE, GT3_MARKER, GTP_MARKERS
 from ..ibt import IbtError, IbtFile
 from ..recommend.history import History
-from . import discord, progress
+from . import discord, progress, retention
 from .config import Settings, load_settings
 from .db import Database, now
 from .worker import DONE, FAILED, QUEUED, Worker, report_text
@@ -304,8 +304,10 @@ def create_app(settings: Settings | None = None) -> Starlette:
         if isinstance(user, Response):
             return user
         uploads = db.uploads_for_user(user["discord_id"])
+        rcfg = retention.config(db)
         for u in uploads:
             u["ab"] = json.loads(u["ab_summary"]) if u["ab_summary"] else None
+            u["keep"] = retention.status(u, rcfg)
         return render(
             request,
             "dashboard.html",
@@ -316,6 +318,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
             guidelines_ok=guidelines_ok(user),
             guidelines_renewed=bool(user.get("guidelines_version")) and not guidelines_ok(user),
             next_tests=db.next_tests(user["discord_id"]),
+            retention_cfg=rcfg,
+            urgent=[u for u in uploads if u["keep"]["kind"] == "frist"],
             paused=uploads_paused(user),
             pause_message=db.get_setting("pause_message"),
         )
@@ -447,6 +451,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             recent=recent,
             log=db.log_entries(limit=8),
             paused=db.get_setting("uploads_paused") == "1",
+            store=retention.overview(db, s.data_dir),
         )
 
     async def admin_people(request: Request) -> Response:
@@ -512,6 +517,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             pause_message=db.get_setting("pause_message"),
             archive_is_open=db.get_setting("archive_open", "1") == "1",
             env_max_mb=s.max_upload_mb,
+            store=retention.overview(db, s.data_dir),
             env_max_files=s.max_files_per_upload,
             guide_version=guidelines_version(),
             guide_confirmed=sum(1 for p in db.users_with_stats() if p.get("guidelines_version") == guidelines_version()),
@@ -531,12 +537,16 @@ def create_app(settings: Settings | None = None) -> Starlette:
     def with_pair(row: dict) -> list[dict]:
         return db.pair_members(row["pair_id"]) if row.get("pair_id") else [row]
 
-    def reanalyse(rows: list[dict]) -> None:
+    def reanalyse(rows: list[dict]) -> bool:
+        """Neu auswerten – nur möglich, solange alle Rohdateien noch da sind."""
+        if any(r.get("raw_deleted_at") or not Path(r["stored_path"]).exists() for r in rows):
+            return False
         forget_tests(rows)
         for r in rows:
             db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None)
         for r in rows:
             worker.submit(r["id"])
+        return True
 
     def delete_uploads(rows: list[dict]) -> None:
         for r in rows:
@@ -579,6 +589,20 @@ def create_app(settings: Settings | None = None) -> Starlette:
                     if val != db.get_setting(key):
                         changes.append(f"{label}: {val}")
                     db.set_setting(key, val)
+            for key, label, lo, hi in (("retention_keep_days", "Aufbewahrung komplett (Tage)", 1, 365),
+                                       ("retention_limit_gb", "Grenze unvollständig (GB)", 1, 10000),
+                                       ("retention_grace_days", "Frist unvollständig (Tage)", 1, 365)):
+                raw = str(form.get(key) or "").strip()
+                if raw.isdigit():
+                    val = str(min(max(int(raw), lo), hi))
+                    if val != db.get_setting(key):
+                        changes.append(f"{label}: {val}")
+                    db.set_setting(key, val)
+            if "retention_move_to" in form:
+                mv = str(form.get("retention_move_to") or "").strip()[:300]
+                if mv != db.get_setting("retention_move_to"):
+                    changes.append("Sicherungsordner: " + (mv or "keiner – Rohdateien werden gelöscht"))
+                db.set_setting("retention_move_to", mv)
             note = str(form.get("pause_message") or "").strip()[:300]
             if ann != db.get_setting("announcement"):
                 changes.append("Ankündigung " + ("gesetzt" if ann else "entfernt"))
@@ -590,16 +614,23 @@ def create_app(settings: Settings | None = None) -> Starlette:
             if changes:
                 db.log(admin_user, "Einstellungen", detail=", ".join(changes))
             return RedirectResponse("/admin/einstellungen?ok=1", status_code=303)
+        if action == "aufraeumen":
+            res = await asyncio.to_thread(retention.run, db)
+            db.set_setting("retention_last_run", now())
+            db.log(admin_user, "Rohdateien aufgeräumt (von Hand)",
+                   detail=f"{res['removed']} gelöscht ({res['freed_gb']:.1f} GB frei), {res['flagged']} mit Frist")
+            return RedirectResponse("/admin/einstellungen?ok=1#speicher", status_code=303)
         if action == "leitfaden_alle":
             rnd = int(db.get_setting("guidelines_round", "0") or 0) + 1
             db.set_setting("guidelines_round", str(rnd))
             db.log(admin_user, "Leitfaden von allen neu bestätigen lassen", detail=reason)
             return RedirectResponse("/admin/einstellungen?ok=1", status_code=303)
         if action == "alles_neu":
-            rows = db.all_uploads(limit=1_000_000)
-            h = History(s.history_path)
-            h.records = []
-            h.save()
+            # nur, wo die Rohdatei noch da ist – Ergebnisse gelöschter Dateien bleiben im Wissen
+            rows = [r for r in db.all_uploads(limit=1_000_000) if not r.get("raw_deleted_at") and Path(r["stored_path"]).exists()]
+            have = {r["id"] for r in rows}
+            rows = [r for r in rows if not r["pair_id"] or all(m["id"] in have for m in db.pair_members(r["pair_id"]))]
+            forget_tests(rows)
             for r in rows:
                 db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None)
             for r in rows:
@@ -623,10 +654,13 @@ def create_app(settings: Settings | None = None) -> Starlette:
             elif action == "werten":
                 for r in group:
                     db.include_upload(r["id"])
-                reanalyse(group)
+                if not reanalyse(group):
+                    return deny("Die Rohdatei ist schon gelöscht – der Upload ist wieder freigegeben, kann aber nicht neu ausgewertet werden. "
+                                "Für eine Neuauswertung die Datei aus der Sicherung zurückspielen.")
                 db.log(admin_user, "Upload wieder gewertet", owner, row["id"], label)
             elif action == "neu_auswerten":
-                reanalyse(group)
+                if not reanalyse(group):
+                    return deny("Die Rohdatei ist schon gelöscht – die bisherige Auswertung bleibt bestehen.")
                 db.log(admin_user, "Upload neu ausgewertet", owner, row["id"], label)
             elif action == "loeschen":
                 delete_uploads(group)
@@ -675,7 +709,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             ex = [r for r in uploads if r["excluded_at"]]
             for r in ex:
                 db.include_upload(r["id"])
-            reanalyse(ex)
+            reanalyse([r for r in ex if not r.get("raw_deleted_at")])
             db.log(admin_user, "Alle Daten wieder gewertet", target, detail=f"{len(ex)} Dateien")
         elif action == "admin_geben":
             db.set_user_admin(target["discord_id"], True)
@@ -817,10 +851,26 @@ def create_app(settings: Settings | None = None) -> Starlette:
     async def health(request: Request) -> Response:
         return JSONResponse({"ok": True, "version": __version__, "discord": s.discord_configured})
 
+    async def cleanup_loop() -> None:
+        """Rohdateien nach den Aufbewahrungsregeln aufräumen – beim Start und dann stündlich."""
+        while True:
+            try:
+                res = await asyncio.to_thread(retention.run, db)
+                db.set_setting("retention_last_run", now())
+                if res["removed"] or res["flagged"]:
+                    log.info("Aufräumen: %s", res)
+                    db.log({"discord_id": "system", "username": "Automatik"}, "Rohdateien aufgeräumt",
+                           detail=f"{res['removed']} gelöscht ({res['freed_gb']:.1f} GB frei), {res['flagged']} mit Frist")
+            except Exception:  # noqa: BLE001
+                log.exception("Aufräumen fehlgeschlagen")
+            await asyncio.sleep(3600)
+
     @asynccontextmanager
     async def lifespan(app: Starlette):
         worker.resume()
+        task = asyncio.create_task(cleanup_loop())
         yield
+        task.cancel()
         worker.shutdown()
 
     routes = [

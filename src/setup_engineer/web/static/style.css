@@ -529,3 +529,10 @@ ul.plain.bad li::marker { color: var(--bremse); content: "✕  "; }
 .gate-confirm .gate-end { margin: 0 0 .8rem; padding-top: 0; border-top: 0; }
 .limits { display: flex; gap: 1rem; flex-wrap: wrap; }
 .stack input[type="number"] { width: 10rem; }
+.keep .ab-line { max-width: 16rem; }
+.keep-frist .ab-line { color: var(--kreide); }
+.keep-info { margin-top: 1rem; max-width: 46rem; color: var(--grau); }
+.keep-info summary { cursor: pointer; color: var(--kreide); }
+.keep-info p { margin: .7rem 0 0; }
+.notice.urgent { border-left-color: var(--bremse); margin: 1rem 0 0; }
+.stack > .btn { justify-self: start; }

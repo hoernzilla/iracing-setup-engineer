@@ -30,6 +30,38 @@
     </form>
   </section>
 
+  <section class="block panel narrow-left" id="speicher">
+    <h2>Speicher und Aufbewahrung</h2>
+    <dl class="kpis small">
+      <div><dt>Rohdateien</dt><dd>{{ "%.1f"|format(store.raw_gb) }}<small> GB</small></dd></div>
+      <div><dt>davon komplett</dt><dd>{{ "%.1f"|format(store.complete_gb) }}<small> GB · {{ store.complete_n }}</small></dd></div>
+      <div><dt>unvollständig</dt><dd>{{ "%.1f"|format(store.incomplete_gb) }}<small> / {{ store.cfg.limit_gb }} GB</small></dd></div>
+      {% if store.free_gb is not none %}<div><dt>Frei auf dem Server</dt><dd>{{ "%.0f"|format(store.free_gb) }}<small> / {{ "%.0f"|format(store.total_gb) }} GB</small></dd></div>{% endif %}
+    </dl>
+    {% if store.flagged_n %}<p class="notice">{{ store.flagged_n }} unvollständige Tests haben wegen der Speichergrenze eine Löschfrist.</p>{% endif %}
+    <p class="fine">Ergebnisse, Berichte und Statistik bleiben immer erhalten – entfernt werden nur die .ibt-Rohdateien.
+      Zuletzt aufgeräumt: {{ store.last_run | datum }} (läuft stündlich automatisch).</p>
+    <form method="post" action="/admin/aktion" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="einstellungen">
+      <input type="hidden" name="announcement" value="{{ announcement }}"><input type="hidden" name="pause_message" value="{{ pause_message }}">
+      {% if paused %}<input type="hidden" name="paused" value="1">{% endif %}{% if archive_is_open %}<input type="hidden" name="archive_open" value="1">{% endif %}
+      <div class="limits">
+        <label><span>Komplette Tests: löschen nach (Tage)</span><input type="number" name="retention_keep_days" min="1" max="365" value="{{ store.cfg.keep_days }}"></label>
+        <label><span>Unvollständige: Grenze (GB)</span><input type="number" name="retention_limit_gb" min="1" max="10000" value="{{ store.cfg.limit_gb }}"></label>
+        <label><span>Unvollständige: Frist danach (Tage)</span><input type="number" name="retention_grace_days" min="1" max="365" value="{{ store.cfg.grace_days }}"></label>
+      </div>
+      <label><span>Sicherungsordner statt Löschen (optional)</span>
+        <input type="text" name="retention_move_to" value="{{ store.cfg.move_to }}" placeholder="z. B. D:\Telemetrie-Archiv – leer = Rohdateien werden gelöscht"></label>
+      <p class="fine">Mit Sicherungsordner werden die Dateien dorthin verschoben statt gelöscht (z. B. eine zweite Platte). Von dort kannst du sie
+        auf deine Offline-Festplatte kopieren.</p>
+      <button type="submit" class="btn btn-small">Speichern</button>
+    </form>
+    <form method="post" action="/admin/aktion" style="margin-top:1rem">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="aufraeumen">
+      <button type="submit" class="btn btn-small btn-ghost">Jetzt aufräumen</button>
+    </form>
+  </section>
+
   <section class="block panel narrow-left">
     <h2>Test-Leitfaden</h2>
     <p>Aktuelle Fassung: <b>{{ guide_version }}</b>, bestätigt von {{ guide_confirmed }} Teilnehmern.</p>

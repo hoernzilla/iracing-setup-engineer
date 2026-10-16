@@ -30,6 +30,13 @@
   </section>
   {% else %}
   <h1 id="upload">Telemetrie hochladen</h1>
+  {% if urgent %}
+  <aside class="notice urgent">
+    <b>{{ urgent | length }} {{ "Test ist" if urgent | length == 1 else "Tests sind" }} noch nicht vollständig</b> und
+    {{ "wird" if urgent | length == 1 else "werden" }} wegen knappem Speicher bald gelöscht – der erste am {{ urgent | map(attribute="keep") | map(attribute="date") | min | datum }}.
+    Bitte vervollständige {{ "ihn" if urgent | length == 1 else "sie" }}, damit die Daten in die Messung eingehen. Details unten bei „Deine Uploads“.
+  </aside>
+  {% endif %}
   {% if paused %}
   <p class="notice">Uploads sind gerade pausiert.{% if pause_message %} {{ pause_message }}{% endif %} Deine bisherigen Auswertungen bleiben unten abrufbar.</p>
   {% endif %}
@@ -108,7 +115,7 @@
       <div class="table-scroll">
         <table class="timing">
           <thead>
-            <tr><th>Gefahren</th><th>Auto</th><th>Strecke</th><th class="num">Runden</th><th class="num">Bestzeit</th><th>Art</th><th>Stand</th><th><span class="visually-hidden">Aktionen</span></th></tr>
+            <tr><th>Gefahren</th><th>Auto</th><th>Strecke</th><th class="num">Runden</th><th class="num">Bestzeit</th><th>Art</th><th>Stand</th><th>Rohdatei</th><th><span class="visually-hidden">Aktionen</span></th></tr>
           </thead>
           <tbody>
           {% for u in uploads %}
@@ -125,6 +132,18 @@
                 {% if u.excluded_at %}<span class="state state-excluded" title="{{ u.excluded_reason or '' }}">aussortiert</span><span class="ab-line">Fließt nicht ins gemeinsame Wissen{% if u.excluded_reason %}: {{ u.excluded_reason }}{% endif %}.</span>{% endif %}
                 {% if u.ab %}<span class="ab-line">{{ u.ab.changes }}: {{ u.ab.verdict }}{% if u.ab.effect_s is not none %} ({{ "%+.3f"|format(u.ab.effect_s) }} s){% endif %}</span>{% endif %}
               </td>
+              <td class="keep keep-{{ u.keep.kind }}">
+                {% set k = u.keep %}
+                {% if k.kind == "komplett" %}<span class="state state-fertig">komplett</span>
+                  <span class="ab-line">wird am {{ k.date | datum }} gelöscht{% if k.days is not none %} (noch {{ k.days }} {{ "Tag" if k.days == 1 else "Tage" }}){% endif %}</span>
+                {% elif k.kind == "frist" %}<span class="state state-fehler">unvollständig</span>
+                  <span class="ab-line"><b>wird am {{ k.date | datum }} gelöscht</b> – {{ k.why }}</span>
+                {% elif k.kind == "offen" %}<span class="state">unvollständig</span>
+                  <span class="ab-line">bleibt erhalten. {{ k.why }}</span>
+                {% elif k.kind == "geloescht" %}<span class="state">gelöscht</span>
+                  <span class="ab-line">am {{ k.date | datum }} – Auswertung und Ergebnis bleiben</span>
+                {% else %}<span class="dim">–</span>{% endif %}
+              </td>
               <td class="actions">
                 {% if u.status == "fertig" %}<a href="/bericht/{{ u.id }}">Auswertung</a>{% endif %}
                 {% if u.ab %}<a href="/bericht/{{ u.id }}/vergleich">Vergleich</a>{% endif %}
@@ -139,6 +158,18 @@
         </table>
       </div>
       <p class="fine">Bestzeit und Runden zählen nur saubere Runden: ohne Out- und Inlap, ohne Ausflüge neben die Strecke.</p>
+      <details class="keep-info">
+        <summary>Warum wir deine Dateien nur {{ retention_cfg.keep_days }} Tage aufheben</summary>
+        <p>Aus jeder Datei ziehen wir einmal alles heraus, was wir brauchen: die Auswertung, die du hier siehst, und bei Tests das
+          gemessene Ergebnis – welche Einstellung was bewirkt hat. Das bleibt dauerhaft gespeichert und fließt ins gemeinsame Wissen.
+          Die Rohdatei selbst (oft 100 MB und mehr) brauchen wir danach nicht mehr.</p>
+        <p>Wir heben sie trotzdem noch <b>{{ retention_cfg.keep_days }} Tage</b> auf: Falls wir die Auswertung verbessern oder ein Fehler
+          auffällt, können wir in dieser Zeit alles neu durchrechnen. Danach wird die Datei gelöscht – <b>deine Auswertungen, Vergleiche und
+          Testergebnisse bleiben erhalten</b>.</p>
+        <p><b>Unvollständige Tests</b> (z. B. keine Umstellung erkannt oder Vergleich fehlt) heben wir länger auf, damit du sie noch
+          vervollständigen kannst. Wird der Speicher knapp, bekommen sie eine Frist von {{ retention_cfg.grace_days }} Tagen – dann steht
+          hier in Rot, bis wann.</p>
+      </details>
     {% else %}
       <p class="empty">Noch nichts hochgeladen. Deine erste Datei liegt unter <code>Dokumente\iRacing\telemetry</code> – am besten eine Session mit zehn oder mehr sauberen Runden.</p>
     {% endif %}

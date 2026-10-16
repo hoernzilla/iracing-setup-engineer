@@ -92,7 +92,15 @@ class Database:
                 "ban_reason": "TEXT",
                 "banned_by": "TEXT",
             },
-            "uploads": {"next_test": "TEXT", "excluded_at": "TEXT", "excluded_reason": "TEXT", "excluded_by": "TEXT"},
+            "uploads": {
+                "next_test": "TEXT",
+                "excluded_at": "TEXT",
+                "excluded_reason": "TEXT",
+                "excluded_by": "TEXT",
+                "done_at": "TEXT",  # komplett ausgewertet seit
+                "raw_deleted_at": "TEXT",  # Rohdatei (.ibt) entfernt; Auswertung bleibt
+                "delete_after": "TEXT",  # Frist für unvollständige Tests bei knappem Speicher
+            },
         }
         for table, cols in wanted.items():
             have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
