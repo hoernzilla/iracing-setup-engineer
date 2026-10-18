@@ -69,6 +69,7 @@ class SynthConfig:
     arb_schedule: dict[int, float] | None = None
     arb_understeer_per_step: float = 0.05  # +5 % Lenküberschuss je Stufe härter
     arb_time_per_step: float = 0.004  # Tempoverlust je Stufe (relativ)
+    start_offset_s: float = 0.0  # Session-Uhr beim Start (späterer Run derselben Session, z. B. nach der Garage)
 
 
 def _curvature(cfg: SynthConfig, ds: float) -> tuple[np.ndarray, np.ndarray]:
@@ -120,7 +121,7 @@ def generate(cfg: SynthConfig = SynthConfig()) -> tuple[dict[str, np.ndarray], s
     rows: dict[str, list[np.ndarray]] = {}
     lap_times = []
     fuel = 60.0
-    t_total = 0.0
+    t_total = cfg.start_offset_s
 
     def push(name: str, arr: np.ndarray) -> None:
         rows.setdefault(name, []).append(arr)

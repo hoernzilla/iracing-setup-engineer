@@ -43,9 +43,9 @@ Kalibrierung an echten GT3-/GTP-Daten steht noch aus.
 
 1. Python 3.11+ installieren: https://www.python.org/downloads/ – „Add python.exe to PATH“ anhaken.
 2. **Analyse + Empfehlungen:** `.ibt`-Dateien per Drag & Drop auf **`Analyse.bat`** ziehen.
-3. **Test auswerten:** zwei `.ibt`-Dateien (erst vorher, dann nachher) auf **`Vergleich.bat`** ziehen –
-   oder eine Datei, wenn du während der Session im Auto umgestellt hast (A-B-A). Der Test wird in der
-   Historie gespeichert und verbessert künftige Empfehlungen.
+3. **Test auswerten:** eine Datei, wenn du während der Session im Auto umgestellt und zurückgestellt hast
+   (A-B-A), oder drei Dateien eines Garagen-Tests (A, B, A) auf **`Vergleich.bat`** ziehen. Nur komplette
+   Tests werden in der Historie gespeichert und verbessern künftige Empfehlungen.
 4. Berichte liegen im Ordner `Berichte` neben den IBT-Dateien.
 
 Kommandozeile:
@@ -53,7 +53,7 @@ Kommandozeile:
 ```
 python -m setup_engineer analyze  SESSION.ibt --out Berichte
 python -m setup_engineer recommend SESSION.ibt          # nur Empfehlungen
-python -m setup_engineer compare  A.ibt B.ibt --save   # A/B-Test zweier Runs, in Historie speichern
+python -m setup_engineer compare  A.ibt B.ibt A2.ibt --save   # Garagen-Test A-B-A, in Historie speichern
 python -m setup_engineer compare  SESSION.ibt --save   # A-B-A innerhalb einer Session
 python -m setup_engineer channels SESSION.ibt           # welche Kanäle liefert das Auto?
 python -m setup_engineer setup    SESSION.ibt           # Setup ausgeben
@@ -82,7 +82,7 @@ src/setup_engineer/
   channels.py   Kanal-Inventar (GT3 vs. GTP)
   analysis.py   Gesamtablauf einer Session
   incar.py      Verstellungen im Auto (dc*-Kanäle)
-  compare.py    A/B-Test (zwei Runs oder A-B-A in einer Session)
+  compare.py    A-B-A-Test (drei Runs aus der Garage oder in einer Session im Auto)
   compare_detail.py  ausführlicher A/B-Bericht mit Fazit
   recommend/    Symptome, Wissensbasis, Engine, Test-Historie, Bericht
   web/          Community-Portal (Starlette): Discord-Login, Upload, Auswertung, Seiten

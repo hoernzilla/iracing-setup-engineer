@@ -71,12 +71,13 @@ def status(row: dict, cfg: dict, now: datetime | None = None) -> dict:
 def _why_incomplete(row: dict) -> str:
     if row["status"] == "fehler":
         return "Die Auswertung ist fehlgeschlagen. Die Admins schauen sich das an."
+    if row.get("test_note"):
+        return row["test_note"]
     if row["test_type"] == "aba":
         return ("In der Datei wurde keine Umstellung im Auto erkannt. Fahr den A-B-A-Test bitte noch einmal: "
-                "Block A, umstellen, Block B, zurückstellen, Block A – alles in einer Session.")
+                "Block A, umstellen, Block B, auf exakt A zurückstellen, Block A – alles in einer Session.")
     if row["test_type"] == "garage":
-        return ("Der Vergleich der beiden Runs fehlt noch – meist, weil sich im Setup nichts oder mehr als eine Sache "
-                "unterscheidet. Bitte beide Runs mit genau einer Änderung noch einmal hochladen.")
+        return "Die anderen Runs dieses Garagen-Tests werden noch ausgewertet."
     return "Noch nicht vollständig ausgewertet."
 
 

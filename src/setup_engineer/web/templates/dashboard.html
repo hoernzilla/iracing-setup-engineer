@@ -47,7 +47,7 @@
     <ul class="plain">
       {% for n in next_tests %}<li><b>{{ n.car }}, {{ n.track }}:</b> {{ n.next_test }}</li>{% endfor %}
     </ul>
-    <p class="fine">Vorschlag aus deiner letzten Auswertung. Ablauf: <a href="/leitfaden#aba">A-B-A im Auto</a> oder <a href="/leitfaden#garage">Garage-Test</a>.</p>
+    <p class="fine">Vorschlag aus deiner letzten Auswertung. Ablauf: <a href="/leitfaden#aba">A-B-A im Auto</a> oder <a href="/leitfaden#garage">Garagen-Test</a>.</p>
   </aside>
   {% endif %}
 
@@ -76,11 +76,11 @@
       </label>
       <label class="choice">
         <input type="radio" name="test_type" value="aba">
-        <span><b>A-B-A-Test im Auto</b> Eine Einstellung im Auto umgestellt und wieder zurück, je 5 Runden. Eine Datei.</span>
+        <span><b>A-B-A-Test im Auto</b> Eine Einstellung im Auto umgestellt und exakt zurück, je 5 Runden. Eine Datei.</span>
       </label>
       <label class="choice">
         <input type="radio" name="test_type" value="garage">
-        <span><b>Garage-Test</b> Genau eine Sache in der Garage geändert, je 6 Runden. Zwei Dateien: vorher und nachher.</span>
+        <span><b>Garagen-Test</b> Run A, Run B mit genau einer Änderung, Run A mit demselben Setup. Je Aufwärmrunde plus 5 Runden. Drei Dateien.</span>
       </label>
     </fieldset>
 

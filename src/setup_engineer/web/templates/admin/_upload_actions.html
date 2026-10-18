@@ -11,7 +11,7 @@
         <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="action" value="aussortieren">
         <label>Grund <input type="text" name="reason" maxlength="300" placeholder="z. B. mehrere Änderungen gleichzeitig"></label>
         <button type="submit" class="btn btn-small">Aussortieren</button>
-        <p class="fine">Bleibt gespeichert, fließt aber nicht ins gemeinsame Wissen.{% if u.pair_id %} Gilt für beide Dateien des Paars.{% endif %}</p>
+        <p class="fine">Bleibt gespeichert, fließt aber nicht ins gemeinsame Wissen.{% if u.pair_id %} Gilt für alle Dateien des Garagen-Tests.{% endif %}</p>
       </form>
       {% else %}
       <form method="post" action="/admin/aktion">

@@ -5,14 +5,14 @@ dauert ~1 s, braucht aber Speicher – parallel bringt bei einer Community nicht
 
 Pro Upload:
 * Analyse + Empfehlungen (mit dem gesammelten Community-Wissen)
-* wurde im Auto umgestellt (A-B-A)? -> Vergleich der Rundengruppen, Test speichern
-* Garage-Test (zwei Dateien) -> sobald beide fertig: A/B-Vergleich, Test speichern
+* wurde im Auto umgestellt und wieder zurückgestellt (A-B-A)? -> Vergleich der Rundengruppen, Test speichern
+* Garagen-Test (drei Dateien A, B, A) -> sobald alle fertig: Prüfung und Vergleich, Test speichern
+Gespeichert werden nur komplette Tests; sonst steht der Grund in ``test_note``.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import uuid
 from datetime import datetime
 import logging
@@ -24,7 +24,7 @@ from pathlib import Path
 from .. import __version__
 from ..classes import car_class
 from ..analysis import analyze_file
-from ..compare import ab_compare, ab_within
+from ..compare import ab_compare, ab_within, garage_problem
 from ..ibt import IbtError
 from ..recommend.engine import recommend
 from ..recommend.history import History, record_from_ab
@@ -38,7 +38,7 @@ log = logging.getLogger("portal.worker")
 QUEUED, RUNNING, DONE, FAILED = "wartet", "läuft", "fertig", "fehler"
 ARCHIVE = "archiv"
 ARCHIVE_MIN_LAPS = 5
-ARCHIVE_PAIR_HOURS = 4  # Altdaten: zwei Sessions gelten als Paar, wenn sie so nah beieinander liegen
+ARCHIVE_PAIR_HOURS = 4  # Altdaten: drei Sessions (A, B, A) gelten als Test, wenn sie so nah beieinander liegen
 
 
 class Worker:
@@ -115,102 +115,117 @@ class Worker:
                     return
             # A-B-A innerhalb der Session (im Auto umgestellt)
             within = ab_within(a) if row["test_type"] != "garage" else None
+            fields["test_note"] = None
             if within is not None:
-                r, name_a, name_b = within
-                ab_path = self.s.reports_dir / f"{upload_id}-ab.md"
-                ab_text = ab_markdown(r, name_a, name_b).replace(Path(row["stored_path"]).name, row["filename"])
-                ab_path.write_text(ab_text, encoding="utf-8")
-                rec = record_from_ab(r, a, None, within_session=True)
-                rec.file_a = rec.file_b = f"{row['user_id']}/{row['filename']}"
-                if archive:
-                    rec.source = ARCHIVE
-                if self._counts([row]):
-                    self._save_test(rec)
-                fields.update(ab_report_path=str(ab_path), ab_summary=_summary(r))
+                r, name_a, name_b, problem = within
+                if problem:
+                    fields["test_note"] = problem
+                else:
+                    ab_path = self.s.reports_dir / f"{upload_id}-ab.md"
+                    ab_text = ab_markdown(r, name_a, name_b).replace(Path(row["stored_path"]).name, row["filename"])
+                    ab_path.write_text(ab_text, encoding="utf-8")
+                    rec = record_from_ab(r, a, None, within_session=True)
+                    rec.file_a = rec.file_b = f"{row['user_id']}/{row['filename']}"
+                    if archive:
+                        rec.source = ARCHIVE
+                    if self._counts([row]):
+                        self._save_test(rec)
+                    fields.update(ab_report_path=str(ab_path), ab_summary=_summary(r))
             self.db.update_upload(upload_id, status=DONE, done_at=now(), **fields)
             if row["pair_id"]:
                 self._try_pair(row["pair_id"])
             elif archive and within is None:
-                self._try_archive_pair(upload_id)
+                self._try_archive_test(upload_id)
         except IbtError as e:
             self.db.update_upload(upload_id, status=FAILED, error=f"Keine gültige iRacing-Telemetrie: {e}")
         except Exception as e:  # noqa: BLE001 – Fehler gehören in die Oberfläche, nicht in den Absturz
             log.error("Auswertung %s fehlgeschlagen:\n%s", upload_id, traceback.format_exc())
             self.db.update_upload(upload_id, status=FAILED, error=f"Auswertung fehlgeschlagen ({type(e).__name__}: {e})")
 
+    @staticmethod
+    def _started(s) -> tuple:
+        t = s.ibt.get("SessionTime")
+        return (s.ibt.disk.session_start_date, float(t[0]) if len(t) else 0.0)
+
     def _try_pair(self, pair_id: str) -> None:
+        """Garagen-Test: sobald alle drei Runs ausgewertet sind, prüfen (A-B-A komplett?) und vergleichen."""
         members = self.db.pair_members(pair_id)
-        if len(members) != 2 or any(m["status"] != DONE for m in members) or any(m["ab_summary"] for m in members):
+        if any(m["status"] != DONE for m in members) or any(m["ab_summary"] for m in members):
+            return
+        if len(members) != 3:
+            note = ("Garagen-Test mit nur zwei Runs (alte Regel) – zählt nicht mehr. Bitte als A-B-A mit drei Runs "
+                    "neu fahren: A, B, und zurück auf das gespeicherte Setup A.")
+            for m in members:
+                self.db.update_upload(m["id"], test_note=note)
             return
         try:
-            x, y = (analyze_file(m["stored_path"]) for m in members)
-
-            def started(s) -> tuple:
-                t = s.ibt.get("SessionTime")
-                return (s.ibt.disk.session_start_date, float(t[0]) if len(t) else 0.0)
-
-            pairs = list(zip((x, y), members))
-            pairs.sort(key=lambda p: started(p[0]))
-            (a, ma), (b, mb) = pairs
-            r = ab_compare(a, b)
+            runs = sorted(((analyze_file(m["stored_path"]), m) for m in members), key=lambda p: self._started(p[0]))
+            (a, ma), (b, mb), (a2, ma2) = runs
+            problem = garage_problem(a, b, a2)
+            if problem:
+                for m in members:
+                    self.db.update_upload(m["id"], test_note=problem)
+                return
+            r = ab_compare(a, b, a2)
             ab_path = self.s.reports_dir / f"{pair_id}-ab.md"
-            ab_path.write_text(ab_markdown(r, ma["filename"], mb["filename"]), encoding="utf-8")
+            ab_path.write_text(ab_markdown(r, f"{ma['filename']} + {ma2['filename']}", mb["filename"]), encoding="utf-8")
             rec = record_from_ab(r, a, b)
-            rec.file_a, rec.file_b = f"{ma['user_id']}/{ma['filename']}", f"{mb['user_id']}/{mb['filename']}"
+            rec.file_a = f"{ma['user_id']}/{ma['filename']} + {ma2['filename']}"
+            rec.file_b = f"{mb['user_id']}/{mb['filename']}"
             if self._counts(members):
                 self._save_test(rec)
             summary = _summary(r)
             for m in members:
-                self.db.update_upload(m["id"], ab_report_path=str(ab_path), ab_summary=summary, done_at=now())
+                self.db.update_upload(m["id"], ab_report_path=str(ab_path), ab_summary=summary, test_note=None, done_at=now())
         except Exception as e:  # noqa: BLE001
             log.error("Vergleich %s fehlgeschlagen:\n%s", pair_id, traceback.format_exc())
             for m in members:
                 self.db.update_upload(m["id"], error=f"Vergleich fehlgeschlagen ({type(e).__name__}: {e})")
 
-
-    def _try_archive_pair(self, upload_id: str) -> None:
-        """Altdaten: Gibt es eine Session desselben Fahrers mit gleichem Auto und gleicher Strecke kurz davor
-        oder danach, deren Setup sich in GENAU einer Einstellung unterscheidet? Dann ist das ein Garage-Test."""
+    def _try_archive_test(self, upload_id: str) -> None:
+        """Altdaten: Drei Sessions desselben Fahrers mit gleichem Auto und gleicher Strecke innerhalb weniger Stunden,
+        in der Mitte genau eine Änderung und danach exakt zurück auf das erste Setup? Dann ist das ein Garagen-Test."""
         row = self.db.get_upload(upload_id)
         if not row or row["pair_id"] or not row["session_start"]:
             return
         t0 = datetime.fromisoformat(row["session_start"])
-        best, best_gap = None, None
+        near = [row]
         for o in self.db.all_uploads(user_id=row["user_id"], status=DONE, excluded="nein", limit=100_000):
             if o["id"] == row["id"] or o["pair_id"] or o["ab_summary"] or o["test_type"] != ARCHIVE or o["raw_deleted_at"]:
                 continue
             if o["car"] != row["car"] or o["track"] != row["track"] or not o["session_start"]:
                 continue
-            gap = abs((datetime.fromisoformat(o["session_start"]) - t0).total_seconds()) / 3600
-            if gap <= ARCHIVE_PAIR_HOURS and (best_gap is None or gap < best_gap):
-                best, best_gap = o, gap
-        if best is None:
+            if abs((datetime.fromisoformat(o["session_start"]) - t0).total_seconds()) / 3600 <= ARCHIVE_PAIR_HOURS:
+                near.append(o)
+        if len(near) < 3:
             return
         try:
-            x, y = analyze_file(row["stored_path"]), analyze_file(best["stored_path"])
-            (a, ma), (b, mb) = sorted([(x, row), (y, best)], key=lambda p: p[1]["session_start"])
-            r = ab_compare(a, b)
-            if _distinct_changes(r.setup_changes) != 1:
-                return  # keine oder mehrere Änderungen -> kein Test
-            pid = uuid.uuid4().hex
-            ab_path = self.s.reports_dir / f"{pid}-ab.md"
-            ab_path.write_text(ab_markdown(r, ma["filename"], mb["filename"]), encoding="utf-8")
-            rec = record_from_ab(r, a, b)
-            rec.file_a, rec.file_b = f"{ma['user_id']}/{ma['filename']}", f"{mb['user_id']}/{mb['filename']}"
-            rec.source = ARCHIVE
-            if self._counts([ma, mb]):
-                self._save_test(rec)
-            summary = _summary(r)
-            for m in (ma, mb):
-                self.db.update_upload(m["id"], pair_id=pid, ab_report_path=str(ab_path), ab_summary=summary, done_at=now())
+            runs = sorted(((analyze_file(m["stored_path"]), m) for m in near), key=lambda p: self._started(p[0]))
+            for i in range(len(runs) - 2):
+                (a, ma), (b, mb), (a2, ma2) = runs[i:i + 3]
+                if upload_id not in (ma["id"], mb["id"], ma2["id"]):
+                    continue
+                span = abs((datetime.fromisoformat(ma2["session_start"]) - datetime.fromisoformat(ma["session_start"])).total_seconds())
+                if span / 3600 > ARCHIVE_PAIR_HOURS or garage_problem(a, b, a2):
+                    continue
+                pid = uuid.uuid4().hex
+                r = ab_compare(a, b, a2)
+                ab_path = self.s.reports_dir / f"{pid}-ab.md"
+                ab_path.write_text(ab_markdown(r, f"{ma['filename']} + {ma2['filename']}", mb["filename"]), encoding="utf-8")
+                rec = record_from_ab(r, a, b)
+                rec.file_a = f"{ma['user_id']}/{ma['filename']} + {ma2['filename']}"
+                rec.file_b = f"{mb['user_id']}/{mb['filename']}"
+                rec.source = ARCHIVE
+                if self._counts([ma, mb, ma2]):
+                    self._save_test(rec)
+                summary = _summary(r)
+                for m in (ma, mb, ma2):
+                    self.db.update_upload(m["id"], pair_id=pid, ab_report_path=str(ab_path), ab_summary=summary, done_at=now())
+                return
         except Exception:  # noqa: BLE001 – ein Fund weniger, kein Fehler für den Nutzer
-            log.warning("Archiv-Paar %s nicht auswertbar:\n%s", upload_id, traceback.format_exc())
+            log.warning("Archiv-Test %s nicht auswertbar:\n%s", upload_id, traceback.format_exc())
 
 
-def _distinct_changes(changes) -> int:
-    """Zahl der Änderungen; links/rechts gleich verstellt (z. B. beide Vorderfedern) zählt als eine."""
-    keys = {(re.sub(r"(Left|Right)(Front|Rear)", r"\2", c.path), c.before, c.after) for c in changes}
-    return len(keys)
 
 
 def _next_test(rs) -> str | None:
@@ -218,7 +233,7 @@ def _next_test(rs) -> str | None:
     if not rs.recommendations:
         return None
     r = rs.recommendations[0]
-    how = "im Auto als A-B-A in einer Session" if r.incar else "als Garage-Test mit zwei Runs"
+    how = "im Auto als A-B-A in einer Session" if r.incar else "als Garagen-Test mit drei Runs (A, B, A)"
     title = f"{r.parameter.replace(' (im Auto)', '')} zurück auf {r.proposed}" if r.revert_of else r.candidate.title
     return f"{title}: {r.parameter.replace(' (im Auto)', '')} {r.current} → {r.proposed}, {how}."
 

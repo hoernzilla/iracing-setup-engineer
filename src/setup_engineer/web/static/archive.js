@@ -5,7 +5,7 @@
   const markers = JSON.parse(root.dataset.markers);
   const csrf = root.dataset.csrf;
   const maxBytes = Number(root.dataset.maxMb) * 1024 * 1024;
-  const MIN_LAPS = 6; // inkl. Outlap; der Server zählt danach saubere Runden
+  const MIN_LAPS = 7; // inkl. Outlap und Aufwärmrunde; der Server zählt danach saubere Runden
   const $ = (id) => document.getElementById(id);
   const rowsEl = $("arch-rows"), msg = $("arch-msg"), btn = $("arch-upload");
   let items = [];

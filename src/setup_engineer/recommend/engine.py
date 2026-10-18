@@ -8,7 +8,7 @@ Ablauf
    Effektgröße; widerlegt -> abwerten)
 4. Konkreten Zielwert bestimmen (Schrittweite aus echten Verstellungen im Auto,
    sonst aus dem Werteformat)
-5. Testplan: im Auto verstellbar -> A-B-A in einer Session, sonst zwei Runs
+5. Testplan: im Auto verstellbar -> A-B-A in einer Session, sonst Garagen-Test mit drei Runs (A, B, A)
 """
 
 from __future__ import annotations
@@ -90,13 +90,13 @@ class Recommendation:
     def test_plan(self) -> str:
         if self.incar:
             return (
-                f"Im Auto verstellbar → A-B-A in **einer** Session: 5 gewertete Runden mit {self.current}, "
-                f"dann im Auto auf {self.proposed}, 5 Runden, zurück auf {self.current}, 5 Runden. "
+                f"Im Auto verstellbar → A-B-A in **einer** Session: Aufwärmrunde plus 5 Runden mit {self.current}, "
+                f"dann im Auto auf {self.proposed}, 5 Runden, zurück auf exakt {self.current}, 5 Runden. "
                 "Die Analyse erkennt die Wechsel und vergleicht die Rundengruppen unter gleichen Bedingungen."
             )
         return (
-            f"Garage-Änderung → zwei Runs direkt hintereinander in derselben Session (gleiche Tageszeit/Wetter), "
-            f"je mindestens 6 gewertete Runden: erst {self.current}, dann {self.proposed}. Danach `compare A.ibt B.ibt --save`."
+            f"Garage-Änderung → drei Runs direkt hintereinander in derselben Session, je Aufwärmrunde plus 5 Runden: "
+            f"Run A mit {self.current} (Setup speichern), Run B mit {self.proposed}, Run A mit dem gespeicherten Setup."
         )
 
 

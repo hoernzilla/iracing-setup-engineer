@@ -100,6 +100,7 @@ class Database:
                 "done_at": "TEXT",  # komplett ausgewertet seit
                 "raw_deleted_at": "TEXT",  # Rohdatei (.ibt) entfernt; Auswertung bleibt
                 "delete_after": "TEXT",  # Frist für unvollständige Tests bei knappem Speicher
+                "test_note": "TEXT",  # Test unvollständig: Grund in Klartext (zählt nicht)
             },
         }
         for table, cols in wanted.items():

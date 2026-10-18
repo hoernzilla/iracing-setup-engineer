@@ -10,6 +10,8 @@ from ..ibt.format import TRK_OFF_TRACK
 from ..ibt.reader import IbtFile
 
 GRID_POINTS = 2000  # Auflösung des gemeinsamen Distanzrasters (0..1 LapDistPct)
+PIT = "Boxengasse (Out-/Inlap)"
+WARMUP = "Aufwärmrunde nach der Boxengasse"
 
 
 @dataclass
@@ -128,11 +130,17 @@ def split_laps(ibt: IbtFile, *, slow_factor: float = 1.07) -> LapSet:
         if e == ibt.record_count:
             lap.invalidate("unvollständig")
         if np.nanmax(on_pit[s:e]) > 0:
-            lap.invalidate("Boxengasse (Out-/Inlap)")
+            lap.invalidate(PIT)
         off = np.sum(surface[s:e] == TRK_OFF_TRACK) / ibt.tick_rate
         if off > 0.2:
             lap.invalidate(f"neben der Strecke ({off:.1f} s)")
         laps.append(lap)
+
+    # Aufwärmrunde: die erste fliegende Runde nach der Boxengasse ist wegen kalter Reifen
+    # spürbar langsamer (echte Daten: 1,5–2,5 s) und verfälscht Zeit und Balance -> nie werten.
+    for prev, lap in zip(laps, laps[1:]):
+        if lap.number == prev.number + 1 and PIT in prev.reasons and PIT not in lap.reasons:
+            lap.invalidate(WARMUP)
 
     # Langsame Ausreißer (Verkehr, Fehler) relativ zum Median
     times = [lap.time_s for lap in laps if lap.valid]

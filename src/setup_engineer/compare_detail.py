@@ -72,23 +72,11 @@ class ABDetail:
 
 # ------------------------------------------------------------------ Bausteine
 def _lap_rows(s: SessionAnalysis) -> list[LapRow]:
-    by_no = {lap.number: lap for lap in s.laps.laps}
-    rows = []
-    for lap in s.laps.laps:
-        prev = by_no.get(lap.number - 1)
-        if not lap.valid:
-            status = ", ".join(lap.reasons)
-        elif prev is not None and any("Boxengasse" in r for r in prev.reasons):
-            status = "Aufwärmrunde (nicht gewertet)"
-        else:
-            status = "gewertet"
-        rows.append(LapRow(lap.number, lap.time_s, status))
-    return rows
+    return [LapRow(lap.number, lap.time_s, "gewertet" if lap.valid else ", ".join(lap.reasons)) for lap in s.laps.laps]
 
 
 def _racing(s: SessionAnalysis) -> list:
-    rows = {r.number: r for r in _lap_rows(s)}
-    return [lap for lap in s.laps.valid if rows[lap.number].status == "gewertet"]
+    return list(s.laps.valid)
 
 
 def _vmax(s: SessionAnalysis) -> float | None:

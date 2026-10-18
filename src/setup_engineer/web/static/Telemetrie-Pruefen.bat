@@ -11,7 +11,7 @@ exit /b
 # in einen eigenen Ordner. Liest nur - aendert, loescht oder verschickt nichts.
 # ---------------------------------------------------------------------------------------------
 $ErrorActionPreference = 'Stop'
-$MinLaps = 6
+$MinLaps = 7
 $GtpMarkers = @('gtp', 'arx-06', 'm hybrid v8', 'v-series.r', '963', '499p')
 
 function Get-CarClass([string]$name) {
@@ -81,7 +81,7 @@ foreach ($f in $files) {
 Write-Progress -Activity 'Pruefe Telemetrie' -Completed
 Write-Host ''
 if ($good.Count -eq 0) {
-    Write-Host 'Keine passenden Dateien gefunden (GT3 oder GTP mit mindestens 6 Runden).'
+    Write-Host 'Keine passenden Dateien gefunden (GT3 oder GTP mit mindestens 7 Runden).'
 } else {
     $good | Sort-Object Klasse, Auto, Datum | Format-Table Datum, Klasse, Auto, Strecke, Runden, MB, Datei -AutoSize | Out-String -Width 220 | Write-Host
     $sum = ($good | Measure-Object MB -Sum).Sum

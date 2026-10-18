@@ -92,9 +92,10 @@ class TestSegmentation(SynthCase):
     def test_laps(self) -> None:
         laps = self.analysis.laps
         self.assertEqual(len(laps.laps), 10)
-        self.assertEqual(len(laps.valid), 8)
+        self.assertEqual(len(laps.valid), 7)  # ohne Out-Lap, Aufwärmrunde und letzte unvollständige Runde
         reasons = {r for lap in laps.laps for r in lap.reasons}
         self.assertIn("unvollständig", reasons)
+        self.assertIn("Aufwärmrunde nach der Boxengasse", reasons)
         self.assertTrue(any("Boxengasse" in r for r in reasons))
 
     def test_corners(self) -> None:
@@ -170,7 +171,7 @@ class TestRealGTP(unittest.TestCase):
 
     def test_basics(self) -> None:
         self.assertEqual(self.a.ibt.car_name, "Porsche 963 GTP")
-        self.assertEqual(len(self.a.laps.valid), 8)
+        self.assertEqual(len(self.a.laps.valid), 7)  # Aufwärmrunde nach der Box zählt nicht
         self.assertAlmostEqual(self.a.laps.best.time_s, 91.993, places=2)
         self.assertGreaterEqual(len(self.a.corners), 11)
 
@@ -213,7 +214,10 @@ class TestRealGTPRepeat(unittest.TestCase):
         self.assertEqual(len(d.laps_a), 12)
         self.assertTrue(d.corner_speeds and d.platform and d.tires)
         text = " ".join(d.conclusions)
-        self.assertIn("erwarteten Wirkung", text)
+        self.assertIn("Balance", text)
+        # Stabi vorne härter -> im mittleren Tempo mehr Untersteuern (ohne die kalte Aufwärmrunde gemessen)
+        mid = [x for x in r.balance if x.zone == "Tempo 150–200 km/h"][0]
+        self.assertGreater(mid.b - mid.a, 0.05)
         self.assertIn("Luftdichte", text)
         self.assertAlmostEqual(sum(s.delta for s in r.sections), r.mean_b - r.mean_a, delta=0.4)
 
@@ -226,13 +230,45 @@ class TestWithinSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as d:
             f = make_file(Path(d) / "aba.ibt", SynthConfig(seed=7, laps=16, arb_schedule={6: 3, 11: 1}))
-            r, name_a, name_b = ab_within(analyze_file(f))
+            r, name_a, name_b, problem = ab_within(analyze_file(f))
+        self.assertIsNone(problem)
         self.assertIn("Stabilisator vorne 1", name_a)
         self.assertIn("Stabilisator vorne 3", name_b)
         self.assertTrue(any("Umstell-Runde" in n for n in r.notes))
         mid = [x for x in r.balance if x.zone == "Tempo 150–200 km/h"][0]
         self.assertAlmostEqual(mid.b - mid.a, 0.10, delta=0.04)  # 2 Stufen × 5 %
         self.assertEqual([c.after for c in r.setup_changes], ["3"])
+
+
+class TestCompleteTests(unittest.TestCase):
+    """Nur komplette A-B-A-Tests zählen – im Auto und in der Garage."""
+
+    def test_incar_without_return_is_incomplete(self) -> None:
+        from setup_engineer.compare import ab_within
+
+        with tempfile.TemporaryDirectory() as d:
+            f = make_file(Path(d) / "ab.ibt", SynthConfig(seed=8, laps=12, arb_schedule={6: 3}))
+            r, _, _, problem = ab_within(analyze_file(f))
+        self.assertIsNone(r)
+        self.assertIn("zweite A-Block fehlt", problem)
+
+    def test_garage_aba(self) -> None:
+        from setup_engineer.compare import garage_problem
+
+        with tempfile.TemporaryDirectory() as d:
+            mk = lambda name, **kw: analyze_file(make_file(Path(d) / name, SynthConfig(laps=8, **kw)))  # noqa: E731
+            a = mk("a.ibt", seed=10)
+            b = mk("b.ibt", seed=11, spring_front="200 N/mm", start_offset_s=1500)
+            a2 = mk("a2.ibt", seed=12, start_offset_s=3000)
+            off = mk("a2x.ibt", seed=13, spring_front="190 N/mm", start_offset_s=3000)
+            same = mk("bx.ibt", seed=14, start_offset_s=1500)
+        self.assertIsNone(garage_problem(a, b, a2))
+        self.assertIn("nicht exakt das Setup", garage_problem(a, b, off))
+        self.assertIn("nichts verstellt", garage_problem(a, same, a2))
+        r = ab_compare(a, b, a2)
+        self.assertIn("Verlauf über die drei Runs", r.covariates)
+        self.assertEqual(r.laps_a, 14)  # beide A-Runs, je 7 gewertete Runden
+        self.assertTrue(any("Kontrolle zweites A" in n for n in r.notes))
 
 
 @unittest.skipUnless(REAL_GTP.exists() and REAL_GTP2.exists(), "echte GTP-Dateien nicht vorhanden")

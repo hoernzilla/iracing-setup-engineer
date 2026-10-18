@@ -2,12 +2,13 @@
 
     setup-engineer analyze   SESSION.ibt [--out ORDNER]
     setup-engineer recommend SESSION.ibt [--out ORDNER]
-    setup-engineer compare   A.ibt [B.ibt] [--save] [--out ORDNER]
+    setup-engineer compare   A.ibt [B.ibt A2.ibt] [--save] [--out ORDNER]
     setup-engineer channels  SESSION.ibt
     setup-engineer setup     SESSION.ibt
 
-compare mit nur EINER Datei vergleicht die Rundengruppen eines A-B-A-Tests
-(Einstellung im Auto während der Session verstellt).
+compare mit EINER Datei: A-B-A-Test im Auto (in der Session verstellt und wieder zurückgestellt).
+compare mit DREI Dateien: Garagen-Test A-B-A (Run A, Run B mit genau einer Änderung, Run A mit exakt
+demselben Setup). Gespeichert (--save) werden nur komplette Tests.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from pathlib import Path
 
 from .analysis import analyze_file
 from .channels import build_inventory
-from .compare import ab_compare, ab_within
+from .compare import ab_compare, ab_within, garage_problem
 from .recommend.engine import recommend
 from .recommend.history import History, record_from_ab
 from .recommend.report import recommend_markdown
@@ -55,30 +56,39 @@ def cmd_analyze(args: argparse.Namespace) -> int:
 
 
 def cmd_compare(args: argparse.Namespace) -> int:
-    a = analyze_file(args.a)
-    if args.b is None:
+    files = [args.a] + list(args.more or [])
+    if len(files) == 2:
+        print("Ein Test braucht A, B und zurück zu A: entweder EINE Datei (im Auto umgestellt und zurückgestellt) "
+              "oder DREI Dateien (Garagen-Test A-B-A).")
+        return 1
+    if len(files) == 1:
+        a = analyze_file(args.a)
         res = ab_within(a)
         if res is None:
             print("Keine Verstellung im Auto zwischen gewerteten Runden gefunden – für A-B-A in einer Session "
-                  "die Einstellung im Auto ändern, oder zwei Dateien angeben.")
+                  "die Einstellung im Auto ändern und danach wieder zurückstellen, oder drei Dateien angeben.")
             return 1
-        r, name_a, name_b = res
-        b = None
+        r, name_a, name_b, problem = res
+        if problem:
+            print(f"Test nicht komplett: {problem}")
+            return 1
+        b = a2 = None
         out_name = f"ab_{Path(args.a).stem}.md"
     else:
-        b = analyze_file(args.b)
-        # Windows legt beim Drag & Drop die Reihenfolge nicht fest -> nach Aufnahmezeit sortieren:
-        # die ältere Aufnahme ist A (vorher), die neuere B (nachher).
+        # Windows legt beim Drag & Drop die Reihenfolge nicht fest -> nach Aufnahmezeit sortieren
         def started(x) -> tuple:
             t = x.ibt.get("SessionTime")
             return (x.ibt.disk.session_start_date, float(t[0]) if len(t) else 0.0)
 
-        if started(b) < started(a):
-            a, b = b, a
-        print(f"A (vorher):  {a.ibt.path.name}  ({a.ibt.start_date:%d.%m.%Y %H:%M} UTC)")
-        print(f"B (nachher): {b.ibt.path.name}  ({b.ibt.start_date:%d.%m.%Y %H:%M} UTC)")
-        r = ab_compare(a, b)
-        name_a, name_b = a.ibt.path.name, b.ibt.path.name
+        a, b, a2 = sorted((analyze_file(f) for f in files), key=started)
+        for label, x in (("A", a), ("B", b), ("A", a2)):
+            print(f"{label}: {x.ibt.path.name}  ({x.ibt.start_date:%d.%m.%Y %H:%M} UTC)")
+        problem = garage_problem(a, b, a2)
+        if problem:
+            print(f"Test nicht komplett: {problem}")
+            return 1
+        r = ab_compare(a, b, a2)
+        name_a, name_b = f"{a.ibt.path.name} + {a2.ibt.path.name}", b.ibt.path.name
         out_name = "ab_vergleich.md"
     _write(args.out, out_name, ab_markdown(r, name_a, name_b))
     if args.save:
@@ -139,9 +149,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--history", type=Path)
     s.set_defaults(func=cmd_recommend)
 
-    s = sub.add_parser("compare", help="A/B-Vergleich zweier Runs oder (eine Datei) der A-B-A-Gruppen")
+    s = sub.add_parser("compare", help="A-B-A-Test: eine Datei (im Auto umgestellt) oder drei Dateien (Garage)")
     s.add_argument("a", type=Path)
-    s.add_argument("b", type=Path, nargs="?")
+    s.add_argument("more", type=Path, nargs="*", help="Run B und zweites A beim Garagen-Test")
     s.add_argument("--out", type=Path)
     s.add_argument("--save", action="store_true", help="Ergebnis in der Test-Historie speichern")
     s.add_argument("--history", type=Path)

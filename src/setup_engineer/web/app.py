@@ -38,11 +38,11 @@ CHUNK = 1024 * 1024
 TEST_TYPES = {
     "normal": "Normale Runs",
     "aba": "A-B-A-Test im Auto",
-    "garage": "Garage-Test (zwei Runs)",
+    "garage": "Garagen-Test (drei Runs: A, B, A)",
     "archiv": "Archiv (Altdaten)",
 }
 # Bei inhaltlichen Änderungen am Leitfaden erhöhen -> alle bestätigen neu
-GUIDELINES_VERSION = "2026-10-15"
+GUIDELINES_VERSION = "2026-10-19"
 # Ziele aus der Datenplanung: Stufe 1 ≈ 30 Tests, Stufe 2 ≈ 70 Tests je Auto
 GOAL_STAGE1, GOAL_STAGE2 = 30, 70
 
@@ -543,7 +543,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             return False
         forget_tests(rows)
         for r in rows:
-            db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None)
+            db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None, test_note=None)
         for r in rows:
             worker.submit(r["id"])
         return True
@@ -632,7 +632,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             rows = [r for r in rows if not r["pair_id"] or all(m["id"] in have for m in db.pair_members(r["pair_id"]))]
             forget_tests(rows)
             for r in rows:
-                db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None)
+                db.update_upload(r["id"], status=QUEUED, error=None, ab_summary=None, ab_report_path=None, next_test=None, test_note=None)
             for r in rows:
                 worker.submit(r["id"])
             db.log(admin_user, "Alle Uploads neu auswerten", detail=f"{len(rows)} Dateien")
@@ -645,7 +645,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
                 return deny("Diesen Upload gibt es nicht mehr.")
             owner = db.get_user(row["user_id"])
             group = with_pair(row)
-            label = row["filename"] + (" (Garage-Paar)" if row.get("pair_id") else "")
+            label = row["filename"] + (" (Garagen-Test)" if row.get("pair_id") else "")
             if action == "aussortieren":
                 forget_tests(group)
                 for r in group:
@@ -773,8 +773,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
         feeling = str(form.get("feeling") or "")[:1000]
         if not files:
             return JSONResponse({"error": "Keine Datei ausgewählt."}, status_code=400)
-        if test_type == "garage" and len(files) != 2:
-            return JSONResponse({"error": "Für einen Garage-Test bitte genau zwei Dateien hochladen: den Run vorher und den Run nachher."}, status_code=400)
+        if test_type == "garage" and len(files) != 3:
+            return JSONResponse({"error": "Für einen Garagen-Test bitte genau drei Dateien hochladen: Run A, Run B und das zweite A."}, status_code=400)
 
         pair_id = uuid.uuid4().hex if test_type == "garage" else None
         user_dir = s.uploads_dir / user["discord_id"]

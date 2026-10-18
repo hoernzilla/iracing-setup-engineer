@@ -92,8 +92,9 @@ Admins (aus `PORTAL_ADMIN_DISCORD_IDS` oder in der Verwaltung ernannt) sehen obe
 Unter **/archiv** laden Mitglieder alte Telemetrie gesammelt hoch (ohne Leitfaden-Pflicht). Der Browser prüft vorab Auto,
 Klasse und Runden und überträgt nur GT3/GTP mit genug Runden. Alternativ gibt es `Telemetrie-Pruefen.bat` zum Herunterladen
 (reines PowerShell, keine Installation), das passende Dateien auflistet und in `telemetry\Setup-Engineer-Upload` kopiert.
-Der Server wertet: Grunddaten ab 5 sauberen Runden, versteckte Garage-Tests (gleiches Auto/Strecke, ≤ 4 h auseinander,
-genau eine Änderung, links/rechts gleich zählt als eine), Verstellungen im Auto. Archiv-Tests zählen halb.
+Der Server wertet: Grunddaten ab 5 sauberen Runden, versteckte Garagen-Tests (drei Sessions mit gleichem Auto/Strecke
+innerhalb von 4 h: in der mittleren genau eine Änderung – links/rechts gleich zählt als eine –, die letzte exakt wie die erste)
+und A-B-A-Verstellungen im Auto. Archiv-Tests zählen halb.
 Ein- und ausschalten unter Verwaltung → Einstellungen.
 
 ## Speicher und Aufbewahrung
@@ -104,6 +105,21 @@ stündlich aufgeräumt (Verwaltung → Einstellungen → Speicher und Aufbewahru
 - unvollständige Tests: bleiben, bis sie zusammen mehr als 60 GB belegen; dann 30 Tage Frist, der Fahrer sieht einen roten Hinweis.
 Optional ein Sicherungsordner: Dateien werden dorthin verschoben statt gelöscht. Ohne Rohdatei ist keine Neuauswertung möglich,
 die bisherigen Ergebnisse bleiben aber erhalten.
+
+## Was als Test zählt
+
+Ins gemeinsame Wissen kommen nur **komplette** Tests:
+
+* **A-B-A im Auto** (eine Datei): Block A, Block B, danach wieder exakt die Werte von A. Ohne zweites A, mit mehr als
+  einer Umstellung oder unterbrochenem B gilt der Test als unvollständig.
+* **Garagen-Test** (drei Dateien in einem Upload): Run A, Run B mit genau einer Änderung, Run A mit exakt demselben
+  Setup wie der erste (vom Fahrer gespeichert und wieder geladen). Verglichen wird B gegen beide A; der Verlauf über die
+  drei Runs (Strecke, Reifen, Fahrer) wird herausgerechnet.
+* In jedem Block mindestens 4 gewertete Runden. Nie gewertet werden Out-Lap, die erste fliegende Runde nach der Box
+  (kalte Reifen), Umstell-Runden, Runden neben der Strecke und deutliche Ausreißer.
+
+Unvollständige Tests zählen nicht; der Fahrer sieht beim Upload den Grund (Spalte `test_note` in `uploads`).
+Alte Garagen-Tests mit nur zwei Runs werden beim Neu-Auswerten nicht mehr gezählt.
 
 ## Test-Leitfaden
 

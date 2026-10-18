@@ -32,7 +32,7 @@
     const garage = testType() === "garage";
     let problem = "";
     if (files.some((f) => !f.name.toLowerCase().endsWith(".ibt"))) problem = "Nur .ibt-Dateien aus Dokumente\\iRacing\\telemetry.";
-    else if (garage && files.length && files.length !== 2) problem = "Für einen Garage-Test bitte genau zwei Dateien wählen: vorher und nachher.";
+    else if (garage && files.length && files.length !== 3) problem = "Für einen Garagen-Test bitte genau drei Dateien wählen: Run A, Run B und das zweite A.";
     btn.disabled = !files.length || !!problem;
     btn.textContent = files.length > 1 ? `${files.length} Dateien hochladen` : "Hochladen";
     setMessage(problem ? escapeHtml(problem) : "", problem ? "error" : "");

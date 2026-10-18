@@ -166,8 +166,11 @@ class TestPortal(unittest.TestCase):
         cls.base = f"http://127.0.0.1:{pport}"
         # Testdateien
         cls.aba = make_file(tmp / "aba.ibt", SynthConfig(seed=7, laps=16, arb_schedule={6: 3, 11: 1})).read_bytes()
+        # Garagen-Test: drei Runs derselben Session (A, B mit anderer Feder, wieder A)
         cls.run_a = make_file(tmp / "a.ibt", SynthConfig(seed=10, laps=8)).read_bytes()
-        cls.run_b = make_file(tmp / "b.ibt", SynthConfig(seed=11, laps=8, spring_front="200 N/mm")).read_bytes()
+        cls.run_b = make_file(tmp / "b.ibt", SynthConfig(seed=11, laps=8, spring_front="200 N/mm", start_offset_s=1500)).read_bytes()
+        cls.run_a2 = make_file(tmp / "a2.ibt", SynthConfig(seed=12, laps=8, start_offset_s=3000)).read_bytes()
+        cls.run_a2_off = make_file(tmp / "a2x.ibt", SynthConfig(seed=13, laps=8, spring_front="190 N/mm", start_offset_s=3000)).read_bytes()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -277,13 +280,15 @@ class TestPortal(unittest.TestCase):
         status, body = b.upload([("963_test.ibt", self.aba)], {"test_type": "aba"}, csrf)
         self.assertEqual(body["items"][0]["message"], "Schon hochgeladen.")
 
-    def test_06_garage_pair(self) -> None:
+    def test_06_garage_test(self) -> None:
         b, csrf = self.member()
-        status, body = b.upload([("vorher.ibt", self.run_a), ("nachher.ibt", self.run_b)], {"test_type": "garage"}, csrf)
+        # Reihenfolge beim Hochladen egal – sortiert wird nach Aufnahmezeit
+        files = [("run_b.ibt", self.run_b), ("run_a2.ibt", self.run_a2), ("run_a.ibt", self.run_a)]
+        status, body = b.upload(files, {"test_type": "garage"}, csrf)
         self.assertEqual(status, 200, body)
         ids = [i["id"] for i in body["items"]]
         self.wait_done(b, ids)
-        for _ in range(50):  # Vergleich läuft nach beiden Auswertungen
+        for _ in range(50):  # Vergleich läuft nach allen drei Auswertungen
             _, _, text = b.req("/api/status")
             rows = {u["id"]: u for u in json.loads(text)["uploads"]}
             if all(rows[i]["has_ab"] for i in ids):
@@ -292,9 +297,38 @@ class TestPortal(unittest.TestCase):
         self.assertTrue(all(rows[i]["has_ab"] for i in ids))
         _, _, html = b.req(f"/bericht/{ids[0]}/vergleich")
         self.assertIn("SpringRate", html)
-        # Garage-Test braucht genau zwei Dateien
-        status, body = b.upload([("einzeln.ibt", self.run_a)], {"test_type": "garage"}, csrf)
+        self.assertIn("Kontrolle zweites A", html)
+        self.assertIn("run_a.ibt + run_a2.ibt", html)
+        # Garagen-Test braucht genau drei Dateien
+        status, body = b.upload([("vorher.ibt", self.run_a), ("nachher.ibt", self.run_b)], {"test_type": "garage"}, csrf)
         self.assertEqual(status, 400)
+        self.assertIn("drei Dateien", body["error"])
+        # Zweites A nicht exakt wie das erste -> zählt nicht, Grund steht beim Upload
+        hist_before = self.settings.history_path.read_text(encoding="utf-8")
+        files = [("x_a.ibt", self.run_a), ("x_b.ibt", self.run_b), ("x_a2.ibt", self.run_a2_off)]
+        status, body = b.upload(files, {"test_type": "garage"}, csrf)
+        ids = [i["id"] for i in body["items"]]
+        self.wait_done(b, ids)
+        for _ in range(50):
+            if "nicht exakt das Setup vom ersten A" in b.req("/meine-daten")[2]:
+                break
+            time.sleep(0.3)
+        self.assertIn("nicht exakt das Setup vom ersten A", b.req("/meine-daten")[2])
+        _, _, text = b.req("/api/status")
+        rows = {u["id"]: u for u in json.loads(text)["uploads"]}
+        self.assertFalse(any(rows[i]["has_ab"] for i in ids))
+        self.assertEqual(self.settings.history_path.read_text(encoding="utf-8"), hist_before)
+
+    def test_065_incar_without_return(self) -> None:
+        b, csrf = self.member()
+        data = make_file(Path(self.tmp.name) / "ab.ibt", SynthConfig(seed=8, laps=12, arb_schedule={6: 3})).read_bytes()
+        status, body = b.upload([("nur_ab.ibt", data)], {"test_type": "aba"}, csrf)
+        self.assertEqual(status, 200, body)
+        uid = body["items"][0]["id"]
+        self.wait_done(b, [uid])
+        _, _, text = b.req("/api/status")
+        self.assertFalse({u["id"]: u for u in json.loads(text)["uploads"]}[uid]["has_ab"])
+        self.assertIn("Der zweite A-Block fehlt", b.req("/meine-daten")[2])
 
     def test_07_rejections(self) -> None:
         b, csrf = self.member()
@@ -422,10 +456,11 @@ class TestPortal(unittest.TestCase):
         self.assertIn("Read-Ibt", body)
         tmp = Path(self.tmp.name)
         a = make_file(tmp / "arch_a.ibt", SynthConfig(seed=51, laps=8)).read_bytes()
-        bb = make_file(tmp / "arch_b.ibt", SynthConfig(seed=52, laps=8, spring_front="200 N/mm")).read_bytes()
+        bb = make_file(tmp / "arch_b.ibt", SynthConfig(seed=52, laps=8, spring_front="200 N/mm", start_offset_s=1500)).read_bytes()
+        a2 = make_file(tmp / "arch_a2.ibt", SynthConfig(seed=54, laps=8, start_offset_s=3000)).read_bytes()
         short = make_file(tmp / "arch_kurz.ibt", SynthConfig(seed=53, laps=3)).read_bytes()
         ids = []
-        for name, data in (("alt_a.ibt", a), ("alt_b.ibt", bb), ("alt_kurz.ibt", short)):
+        for name, data in (("alt_a.ibt", a), ("alt_b.ibt", bb), ("alt_a2.ibt", a2), ("alt_kurz.ibt", short)):
             body = b.req("/api/upload?art=archiv", *self._multipart([(name, data)], {"test_type": "archiv"}, csrf))[2]
             ids.append(json.loads(body)["items"][0]["id"])
         self.wait_done(b, ids)
@@ -434,7 +469,7 @@ class TestPortal(unittest.TestCase):
             if any(r.get("source") == "archiv" and "alt_a.ibt" in r["file_a"] + r["file_b"] for r in hist):
                 break
             time.sleep(0.3)
-        self.assertTrue(any(r.get("source") == "archiv" for r in hist), "versteckter Garage-Test nicht gefunden")
+        self.assertTrue(any(r.get("source") == "archiv" for r in hist), "versteckter Garagen-Test nicht gefunden")
         _, _, html = b.req("/archiv")
         self.assertIn("weniger als 5 saubere Runden", html)
         _, _, html = Browser(self.base).req("/fortschritt")
