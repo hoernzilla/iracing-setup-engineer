@@ -41,8 +41,9 @@ TEST_TYPES = {
     "garage": "Garagen-Test (drei Runs: A, B, A)",
     "archiv": "Archiv (Altdaten)",
 }
-# Bei inhaltlichen Änderungen am Leitfaden erhöhen -> alle bestätigen neu
-GUIDELINES_VERSION = "2026-10-19"
+# Stand der ersten Bestätigung – bleibt fest. Erneut bestätigen müssen alle nur, wenn ein Admin das in der
+# Verwaltung auslöst (Einstellung guidelines_round); Text-Änderungen am Leitfaden allein lösen nichts aus.
+GUIDELINES_VERSION = "2026-10-15"
 # Ziele aus der Datenplanung: Stufe 1 ≈ 30 Tests, Stufe 2 ≈ 70 Tests je Auto
 GOAL_STAGE1, GOAL_STAGE2 = 30, 70
 
@@ -176,7 +177,13 @@ def create_app(settings: Settings | None = None) -> Starlette:
         return render(request, "message.html", status_code=status_code, title=title, text=text, action=action)
 
     def guidelines_ok(user: dict | None) -> bool:
-        return bool(user and user.get("guidelines_version") == guidelines_version())
+        """Einmal bestätigt reicht – bis ein Admin eine neue Runde auslöst. Gezählt wird nur die Runde
+        (Teil nach dem Punkt), damit auch ältere gespeicherte Stände gültig bleiben."""
+        stored = (user or {}).get("guidelines_version") or ""
+        if not stored:
+            return False
+        rnd = lambda v: int(v.split(".", 1)[1]) if "." in v and v.split(".", 1)[1].isdigit() else 0  # noqa: E731
+        return rnd(stored) >= rnd(guidelines_version())
 
     def require_user(request: Request) -> dict | Response:
         user = current_user(request)
@@ -425,7 +432,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
         p["banned"] = is_banned(p)
         p["owner"] = is_owner(p)
         p["is_admin_any"] = p["owner"] or bool(p.get("is_admin"))
-        p["guide_ok"] = p.get("guidelines_version") == guidelines_version()
+        p["guide_ok"] = guidelines_ok(p)
         return p
 
     def upload_view(u: dict) -> dict:
@@ -520,7 +527,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             store=retention.overview(db, s.data_dir),
             env_max_files=s.max_files_per_upload,
             guide_version=guidelines_version(),
-            guide_confirmed=sum(1 for p in db.users_with_stats() if p.get("guidelines_version") == guidelines_version()),
+            guide_confirmed=sum(1 for p in db.users_with_stats() if guidelines_ok(p)),
             owners=sorted(s.admin_discord_ids),
             saved=request.query_params.get("ok") == "1",
         )

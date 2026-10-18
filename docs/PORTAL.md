@@ -125,8 +125,9 @@ Alte Garagen-Tests mit nur zwei Runs werden beim Neu-Auswerten nicht mehr gezäh
 
 Vor dem ersten Upload muss jeder den Leitfaden bis zum Ende durchscrollen und bestätigen; vorher
 lehnt der Server Uploads ab. Der Text steht in `src/setup_engineer/web/templates/_leitfaden.html`.
-Wird er inhaltlich geändert, in `web/app.py` das Datum in `GUIDELINES_VERSION` hochsetzen –
-dann muss jeder ihn beim nächsten Besuch erneut bestätigen. Wer wann bestätigt hat, steht in der
+Bestätigt wird einmal beim ersten Login. Erneut bestätigen müssen alle nur, wenn ein Admin das unter
+Verwaltung → Einstellungen → „Leitfaden von allen neu bestätigen lassen“ auslöst – auch nach Änderungen am Text.
+Wer wann bestätigt hat, steht in der
 Admin-Übersicht bzw. in `portal.sqlite3` (Spalten `guidelines_version`, `guidelines_at`).
 
 ## Aktualisieren

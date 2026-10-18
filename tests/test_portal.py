@@ -258,6 +258,21 @@ class TestPortal(unittest.TestCase):
             self.assertIn("leitfaden=fehlt", headers["location"])
         self.assertEqual(Browser(self.base).req("/leitfaden")[0], 200)
 
+    def test_046_guidelines_only_once(self) -> None:
+        """Einmal bestätigt bleibt bestätigt – auch mit einem älteren gespeicherten Stand – bis ein Admin neu auslöst."""
+        from setup_engineer.web.db import Database
+
+        b, csrf = self.member()
+        db = Database(self.settings.db_path)
+        db.set_guidelines(MEMBER["id"], "2026-10-19")  # Stand aus 0.7.0
+        self.assertNotIn("Erst der Leitfaden", b.req("/meine-daten")[2])
+        db.set_setting("guidelines_round", "1")  # Admin: alle neu bestätigen lassen
+        try:
+            self.assertIn("Erst der Leitfaden", b.req("/meine-daten")[2])
+        finally:
+            db.set_setting("guidelines_round", "0")
+        self.assertNotIn("Erst der Leitfaden", b.req("/meine-daten")[2])
+
     def test_05_upload_aba_and_reports(self) -> None:
         b, csrf = self.member()
         status, body = b.upload([("963_test.ibt", self.aba)], {"test_type": "aba", "description": "Stabi vorne 1 auf 3"}, csrf)
