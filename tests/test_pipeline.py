@@ -240,6 +240,25 @@ class TestWithinSession(unittest.TestCase):
         self.assertEqual([c.after for c in r.setup_changes], ["3"])
 
 
+class TestWarmupLap(unittest.TestCase):
+    """Aufwärmrunde nur, wenn die Ausfahrt aus der Box kurz war (Nordschleife: Reifen danach schon warm)."""
+
+    def test_short_and_long_exit(self) -> None:
+        from setup_engineer.segment import laps as laps_mod
+
+        with tempfile.TemporaryDirectory() as d:
+            f = make_file(Path(d) / "w.ibt", SynthConfig(seed=3, laps=6, pit_lane_share=0.2))
+            short = analyze_file(f)
+            self.assertIn(laps_mod.WARMUP, short.laps.laps[1].reasons)  # Ausfahrt < 10 km
+            orig = laps_mod.WARM_AFTER_M
+            laps_mod.WARM_AFTER_M = 500  # wie eine lange Strecke: Ausfahrt länger als die Schwelle
+            try:
+                long_ = analyze_file(f)
+            finally:
+                laps_mod.WARM_AFTER_M = orig
+            self.assertTrue(long_.laps.laps[1].valid)
+
+
 class TestCompleteTests(unittest.TestCase):
     """Nur komplette A-B-A-Tests zählen – im Auto und in der Garage."""
 
