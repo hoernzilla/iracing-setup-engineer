@@ -69,7 +69,6 @@ class SynthConfig:
     arb_schedule: dict[int, float] | None = None
     arb_understeer_per_step: float = 0.05  # +5 % Lenküberschuss je Stufe härter
     arb_time_per_step: float = 0.004  # Tempoverlust je Stufe (relativ)
-    pit_lane_share: float = 1.0  # Anteil der Outlap in der Boxengasse (Rest: Ausfahrt bis zur Linie)
     start_offset_s: float = 0.0  # Session-Uhr beim Start (späterer Run derselben Session, z. B. nach der Garage)
 
 
@@ -185,7 +184,7 @@ def generate(cfg: SynthConfig = SynthConfig()) -> tuple[dict[str, np.ndarray], s
         push("Throttle", throttle.astype(np.float32))
         push("Gear", np.clip((v / 15).astype(int) + 1, 1, 6).astype(np.int32))
         push("RPM", (3000 + (v % 15) * 400).astype(np.float32))
-        push("OnPitRoad", (np.arange(n_t) < n_t * cfg.pit_lane_share) if lap == 0 else np.zeros(n_t, dtype=bool))
+        push("OnPitRoad", np.full(n_t, lap == 0, dtype=bool))
         push("PlayerTrackSurface", np.full(n_t, 3, dtype=np.int32))
         push("FuelLevel", (fuel - tt * 0.03).astype(np.float32))
         push("TrackTempCrew", np.full(n_t, 31.0 + lap * 0.1, dtype=np.float32))

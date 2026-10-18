@@ -12,7 +12,6 @@ from ..ibt.reader import IbtFile
 GRID_POINTS = 2000  # Auflösung des gemeinsamen Distanzrasters (0..1 LapDistPct)
 PIT = "Boxengasse (Out-/Inlap)"
 WARMUP = "Aufwärmrunde nach der Boxengasse"
-WARM_AFTER_M = 10_000  # so weit nach der Boxenausfahrt gelten die Reifen als warm
 
 
 @dataclass
@@ -137,17 +136,11 @@ def split_laps(ibt: IbtFile, *, slow_factor: float = 1.07) -> LapSet:
             lap.invalidate(f"neben der Strecke ({off:.1f} s)")
         laps.append(lap)
 
-    # Aufwärmrunde: die erste fliegende Runde nach der Boxengasse ist wegen kalter Reifen spürbar
-    # langsamer (echte Daten Watkins Glen: 1,5–2,5 s) und verfälscht Zeit und Balance -> nicht werten.
-    # Auf langen Strecken (Nordschleife) ist schon die Ausfahrt so lang, dass die Reifen danach warm sind.
-    length = ibt.track_length_m
-    raw_pct = ibt.get("LapDistPct")
+    # Aufwärmrunde: die erste fliegende Runde nach der Boxengasse ist wegen kalter Reifen
+    # spürbar langsamer (echte Daten: 1,5–2,5 s) und verfälscht Zeit und Balance -> nie werten.
     for prev, lap in zip(laps, laps[1:]):
-        if lap.number != prev.number + 1 or PIT not in prev.reasons or PIT in lap.reasons:
-            continue
-        if length and _after_pit_exit_m(raw_pct, on_pit, prev.start, prev.end, length) >= WARM_AFTER_M:
-            continue
-        lap.invalidate(WARMUP)
+        if lap.number == prev.number + 1 and PIT in prev.reasons and PIT not in lap.reasons:
+            lap.invalidate(WARMUP)
 
     # Langsame Ausreißer (Verkehr, Fehler) relativ zum Median
     times = [lap.time_s for lap in laps if lap.valid]
@@ -159,19 +152,6 @@ def split_laps(ibt: IbtFile, *, slow_factor: float = 1.07) -> LapSet:
 
     grid = np.linspace(0.0, 1.0, GRID_POINTS, endpoint=False)
     return LapSet(ibt=ibt, laps=laps, grid=grid)
-
-
-def _after_pit_exit_m(pct: np.ndarray, on_pit: np.ndarray, s: int, e: int, length: float) -> float:
-    """Gefahrene Strecke (m) zwischen dem Verlassen der Boxengasse und dem Ende dieser Runde."""
-    pit_idx = np.flatnonzero(on_pit[s:e] > 0)
-    if pit_idx.size == 0:
-        return 0.0
-    seg = pct[s + pit_idx[-1] + 1:e]
-    if seg.size < 2:
-        return 0.0
-    d = np.diff(seg)
-    d = np.where(d < -0.5, d + 1.0, d)  # Linienübertritt
-    return float(np.clip(d, 0.0, None).sum() * length)
 
 
 def _crossing_time(t: np.ndarray, pct: np.ndarray, s: int, e: int) -> float:

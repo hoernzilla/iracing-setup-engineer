@@ -116,8 +116,7 @@ Ins gemeinsame Wissen kommen nur **komplette** Tests:
   Setup wie der erste (vom Fahrer gespeichert und wieder geladen). Verglichen wird B gegen beide A; der Verlauf über die
   drei Runs (Strecke, Reifen, Fahrer) wird herausgerechnet.
 * In jedem Block mindestens 4 gewertete Runden. Nie gewertet werden Out-Lap, die erste fliegende Runde nach der Box
-  (kalte Reifen – außer die Ausfahrt war schon 10 km oder länger, z. B. Nordschleife), Umstell-Runden, Runden neben
-  der Strecke und deutliche Ausreißer.
+  (kalte Reifen), Umstell-Runden, Runden neben der Strecke und deutliche Ausreißer.
 
 Unvollständige Tests zählen nicht; der Fahrer sieht beim Upload den Grund (Spalte `test_note` in `uploads`).
 Alte Garagen-Tests mit nur zwei Runs werden beim Neu-Auswerten nicht mehr gezählt.
