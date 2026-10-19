@@ -7,3 +7,4 @@ python-multipart>=0.0.9
 jinja2>=3.1
 itsdangerous>=2.1
 markdown>=3.5
+tzdata>=2024.1  # Zeitzonen-Daten für Windows (Anzeige in deutscher Zeit)

@@ -258,6 +258,15 @@ class TestPortal(unittest.TestCase):
             self.assertIn("leitfaden=fehlt", headers["location"])
         self.assertEqual(Browser(self.base).req("/leitfaden")[0], 200)
 
+    def test_047_times_in_german_time(self) -> None:
+        """Gespeichert wird UTC, angezeigt deutsche Zeit (Sommer- und Winterzeit)."""
+        from setup_engineer.web.app import fmt_date
+
+        self.assertEqual(fmt_date("2026-10-19T00:27:00+00:00"), "19.10.2026 02:27")  # Sommerzeit, +2 h
+        self.assertEqual(fmt_date("2026-12-01T12:00:00+00:00"), "01.12.2026 13:00")  # Winterzeit, +1 h
+        self.assertEqual(fmt_date("2026-10-19T00:27"), "19.10.2026 02:27")  # ohne Zone = UTC
+        self.assertEqual(fmt_date(None), "–")
+
     def test_046_guidelines_only_once(self) -> None:
         """Einmal bestätigt bleibt bestätigt – auch mit einem älteren gespeicherten Stand – bis ein Admin neu auslöst."""
         from setup_engineer.web.db import Database

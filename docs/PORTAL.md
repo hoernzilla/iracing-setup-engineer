@@ -168,3 +168,4 @@ Alles im Ordner `portal-data` neben dem Programm (oder dem in `PORTAL_DATA_DIR` 
 | Nach dem Login sofort wieder abgemeldet | `PORTAL_HTTPS_ONLY=1`, aber Aufruf über `http://` – entweder HTTPS nutzen oder auf 0 setzen |
 | Seite lädt von außen nicht | läuft `Portal-Starten.bat`? Firewall-Freigabe (Einrichten als Administrator) und Freigabe beim Hoster für TCP 29630 prüfen; auf dem Server selbst testen mit `http://localhost:29630` |
 | Upload bricht bei großen Dateien ab | `PORTAL_MAX_UPLOAD_MB` in `portal.env` |
+| Uhrzeiten um ein oder zwei Stunden verschoben | Gespeichert wird UTC, angezeigt in `PORTAL_TIMEZONE` (Standard `Europe/Berlin`); unter Windows braucht das das Paket `tzdata` – `Portal-Aktualisieren.bat` installiert es mit |

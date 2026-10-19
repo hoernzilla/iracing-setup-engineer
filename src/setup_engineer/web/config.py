@@ -54,6 +54,7 @@ class Settings:
     https_only: bool = False  # True, sobald das Portal über HTTPS erreichbar ist
     session_secret: str = ""
     dev_login: bool = False  # nur zum lokalen Testen ohne Discord
+    timezone: str = "Europe/Berlin"  # Anzeige von Datum und Uhrzeit (gespeichert wird UTC)
     discord_api_base: str = "https://discord.com/api/v10"
     discord_authorize_url: str = "https://discord.com/oauth2/authorize"
 
@@ -100,6 +101,7 @@ def load_settings(env_file: str | os.PathLike[str] | None = None) -> Settings:
         community_name=get("PORTAL_COMMUNITY_NAME", Settings.community_name),
         operator_name=get("PORTAL_OPERATOR_NAME"),
         operator_contact=get("PORTAL_OPERATOR_CONTACT"),
+        timezone=get("PORTAL_TIMEZONE", Settings.timezone) or Settings.timezone,
         data_dir=Path(get("PORTAL_DATA_DIR", str(Settings.data_dir))),
         max_upload_mb=int(get("PORTAL_MAX_UPLOAD_MB", "400")),
         host=get("PORTAL_HOST", "127.0.0.1"),

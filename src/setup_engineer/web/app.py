@@ -9,8 +9,9 @@ import logging
 import re
 import secrets
 import uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 
 import markdown as md
@@ -79,12 +80,29 @@ def fmt_lap(sec: float | None) -> str:
     return f"{int(m)}:{s:06.3f}"
 
 
+# Gespeichert wird in UTC, angezeigt in der Zeitzone aus portal.env (PORTAL_TIMEZONE, Standard Europe/Berlin).
+_DISPLAY_TZ: tzinfo | None = None
+
+
+def set_display_timezone(name: str) -> None:
+    global _DISPLAY_TZ
+    try:
+        _DISPLAY_TZ = ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        log.warning("Zeitzone %r unbekannt – es wird die Ortszeit des Servers angezeigt", name)
+        _DISPLAY_TZ = None  # None = Ortszeit des Servers
+
+
 def fmt_date(iso: str | None) -> str:
     if not iso:
         return "–"
-    d = iso[:16].replace("T", " ")
-    y, mo, rest = d[:4], d[5:7], d[8:]
-    return f"{rest[:2]}.{mo}.{y} {rest[3:]}" if len(rest) >= 8 else d
+    try:
+        d = datetime.fromisoformat(iso)
+    except ValueError:
+        return iso
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(_DISPLAY_TZ).strftime("%d.%m.%Y %H:%M")
 
 
 def safe_report_html(text: str) -> str:
@@ -104,6 +122,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
     templates = Jinja2Templates(directory=str(HERE / "templates"))
     templates.env.filters["lap"] = fmt_lap
     templates.env.filters["datum"] = fmt_date
+    set_display_timezone(s.timezone)
     templates.env.globals.update(
         community=s.community_name,
         operator_name=s.operator_name,
