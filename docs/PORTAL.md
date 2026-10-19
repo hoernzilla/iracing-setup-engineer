@@ -121,6 +121,25 @@ Ins gemeinsame Wissen kommen nur **komplette** Tests:
 Unvollständige Tests zählen nicht; der Fahrer sieht beim Upload den Grund (Spalte `test_note` in `uploads`).
 Alte Garagen-Tests mit nur zwei Runs werden beim Neu-Auswerten nicht mehr gezählt.
 
+## Trophäen und Bestenliste
+
+Angemeldete Mitglieder sehen unter **Pokale** ihren eigenen Pokalschrank und unter **Bestenliste** die Top 10
+(nur für Angemeldete, weil dort Namen stehen). Neue Trophäen erscheinen beim nächsten Seitenaufruf als Pop-up mit
+Konfetti – Team-, geheime und Champion-Trophäen mit Feuerwerk, Pannen-Trophäen mit Wackeln.
+
+* **Punkte:** 10 je komplettem Test, 5 je Test aus Altdaten, dazu die Trophäenpunkte (bei Stufen zählen alle
+  erreichten Stufen). Lizenz: R, D ab 100, C ab 250, B ab 500, A ab 900, Pro ab 1.400.
+* **Sichtbarkeit:** Den kompletten Katalog zeigt das Portal nirgends. Eine Trophäe ist erst sichtbar, wenn jemand sie hat.
+* **Berechnung:** nach jeder Auswertung, nach dem stündlichen Aufräumen und bei Pannen-Ereignissen – aus dem Datenbestand,
+  ohne aussortierte Uploads und gesperrte Teilnehmer. Einmal verdient bleibt verdient.
+* **Je Auto:** Stufe-1- und Stufe-2-Kristall für alle Beteiligten, Champion für die meisten kompletten Tests im Auto,
+  sobald es Stufe 2 erreicht (Gleichstand: wer die Zahl zuerst hatte). Je Klasse Krone und Meistergürtel, sobald alle
+  5 GTP bzw. 11 GT3 so weit sind (`CLASS_SIZE` in `web/trophies.py`).
+* **Aberkennen:** Verwaltung → Teilnehmer → Person → Trophäen. Aberkannte Trophäen werden nicht automatisch neu vergeben;
+  „Zurückgeben“ macht das rückgängig. Beides steht im Protokoll.
+
+Katalog, Schwellen und Punkte stehen in `src/setup_engineer/web/trophies.py`, die Zeichnungen in `web/static/trophies.js`.
+
 ## Test-Leitfaden
 
 Vor dem ersten Upload muss jeder den Leitfaden bis zum Ende durchscrollen und bestätigen; vorher

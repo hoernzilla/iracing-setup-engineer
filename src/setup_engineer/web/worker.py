@@ -47,6 +47,7 @@ class Worker:
         self.db = db
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="auswertung")
         self._history_lock = threading.Lock()
+        self.on_change = lambda: None  # z. B. Trophäen neu berechnen
 
     def resume(self) -> None:
         """Nach einem Neustart liegengebliebene Uploads erneut einreihen."""
@@ -54,7 +55,14 @@ class Worker:
             self.submit(row["id"])
 
     def submit(self, upload_id: str) -> None:
-        self.pool.submit(self._run, upload_id)
+        self.pool.submit(self._job, upload_id)
+
+    def _job(self, upload_id: str) -> None:
+        self._run(upload_id)
+        try:
+            self.on_change()
+        except Exception:  # noqa: BLE001
+            log.exception("Nachlauf nach Auswertung fehlgeschlagen")
 
     def shutdown(self) -> None:
         self.pool.shutdown(wait=False, cancel_futures=True)
@@ -97,6 +105,7 @@ class Worker:
                 session_start=a.ibt.start_date.isoformat(timespec="minutes"),
                 laps_total=len(a.laps.laps),
                 laps_valid=len(a.laps.valid),
+                offtrack_laps=sum(1 for lap in a.laps.laps if any(x.startswith("neben der Strecke") for x in lap.reasons)),
                 best_lap_s=best.time_s if best else None,
                 report_path=str(report_path),
                 analysis_version=__version__,
@@ -247,6 +256,9 @@ def _summary(r) -> str:
             "effect_s": None if r.effect_s != r.effect_s else round(r.effect_s, 3),
             "laps_a": r.laps_a,
             "laps_b": r.laps_b,
+            "p_value": None if r.p_value != r.p_value else round(r.p_value, 5),
+            "ci95_s": None if r.ci95_s[0] != r.ci95_s[0] else [round(r.ci95_s[0], 3), round(r.ci95_s[1], 3)],
+            "lap_sd_s": None if r.lap_sd_s is None or r.lap_sd_s != r.lap_sd_s else round(r.lap_sd_s, 3),
         },
         ensure_ascii=False,
     )

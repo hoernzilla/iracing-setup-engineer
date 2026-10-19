@@ -23,6 +23,8 @@
         <a href="/fortschritt" {% if path == '/fortschritt' %}aria-current="page"{% endif %}>Fortschritt</a>
         <a href="/leitfaden" {% if path == '/leitfaden' %}aria-current="page"{% endif %}>Leitfaden</a>
         {% if user and user.consent_at %}
+          <a href="/pokale" {% if path == '/pokale' %}aria-current="page"{% endif %}>Pokale</a>
+          <a href="/bestenliste" {% if path == '/bestenliste' %}aria-current="page"{% endif %}>Bestenliste</a>
           <a href="/meine-daten" class="nav-strong" {% if path == '/meine-daten' %}aria-current="page"{% endif %}>Meine Daten</a>
           {% if admin %}<a href="/admin" class="nav-admin" {% if path.startswith('/admin') %}aria-current="page"{% endif %}>Verwaltung</a>{% endif %}
           <span class="me">
@@ -48,6 +50,8 @@
       <p><a href="/datenschutz">Datenschutz</a> <span class="sep" aria-hidden="true">/</span> Version {{ version }}</p>
     </div>
   </footer>
+  {% if new_trophies %}<script type="application/json" id="new-trophies" data-csrf="{{ csrf }}">{{ new_trophies | tojson }}</script>{% endif %}
+  {% if new_trophies or uses_trophies %}<script src="/static/trophies.js?v={{ version }}" defer></script>{% endif %}
   {% block scripts %}{% endblock %}
 </body>
 </html>

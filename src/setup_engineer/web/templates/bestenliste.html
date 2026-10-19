@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Bestenliste{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <p class="kicker">Bestenliste</p>
+  <h1>Top 10</h1>
+  <p class="lead">Punkte aus kompletten Tests und Trophäen. Gezeigt werden je Fahrer die wertvollsten Trophäen – nur solche, die schon jemand verdient hat.</p>
+  <div class="board-cols">
+    <section>
+      {% if rows %}
+      <div class="table-scroll">
+        <table class="board">
+          <thead><tr><th>#</th><th>Fahrer</th><th>Lizenz</th><th class="num">Tests</th><th class="num">Punkte</th><th>Wertvollste Trophäen</th></tr></thead>
+          <tbody>
+          {% for r in rows %}
+            <tr{% if r.me %} class="is-me"{% endif %}><td class="rank">{{ loop.index }}</td><td><b>{{ r.name }}</b></td><td><span class="lic">{{ r.license }}</span></td>
+              <td class="num">{{ r.tests }}</td><td class="num">{{ "{:,}".format(r.total).replace(",", ".") }}</td>
+              <td><span class="mini">{% for b in r.best %}<svg viewBox="0 0 160 200" role="img" aria-label="{{ r.best_names[loop.index0] }}" data-trophy='{{ b }}'><title>{{ r.best_names[loop.index0] }}</title></svg>{% endfor %}</span></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="notice">Noch hat niemand Punkte. Der erste komplette Test bringt die ersten.</p>
+      {% endif %}
+    </section>
+    <section>
+      <h2>Zuletzt entdeckt</h2>
+      <p class="fine">Wer eine Trophäe als Erster bekommt, macht sie für alle sichtbar.</p>
+      {% if feed %}
+      <ul class="feed">
+        {% for f in feed %}
+        <li><svg viewBox="0 0 160 200" aria-hidden="true" data-trophy='{{ f.json }}'></svg><div><b>{{ f.d.name }}</b><span>{{ f.who }} · {{ f.when | datum }}</span></div></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="dim">Noch nichts entdeckt.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

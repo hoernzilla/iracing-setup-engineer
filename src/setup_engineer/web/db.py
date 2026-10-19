@@ -61,6 +61,21 @@ CREATE TABLE IF NOT EXISTS admin_log (
     target_upload TEXT,
     detail        TEXT
 );
+CREATE TABLE IF NOT EXISTS trophies (
+    user_id    TEXT NOT NULL,
+    trophy_id  TEXT NOT NULL,
+    tier       INTEGER,
+    earned_at  TEXT NOT NULL,
+    seen_at    TEXT,
+    revoked_at TEXT,
+    PRIMARY KEY (user_id, trophy_id)
+);
+CREATE TABLE IF NOT EXISTS events (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    kind    TEXT NOT NULL,
+    at      TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS uploads_user ON uploads(user_id);
 CREATE INDEX IF NOT EXISTS uploads_sha ON uploads(user_id, sha256);
 """
@@ -101,6 +116,7 @@ class Database:
                 "raw_deleted_at": "TEXT",  # Rohdatei (.ibt) entfernt; Auswertung bleibt
                 "delete_after": "TEXT",  # Frist für unvollständige Tests bei knappem Speicher
                 "test_note": "TEXT",  # Test unvollständig: Grund in Klartext (zählt nicht)
+                "offtrack_laps": "INTEGER",  # Runden mit Ausflug neben die Strecke
             },
         }
         for table, cols in wanted.items():
@@ -194,6 +210,8 @@ class Database:
     def delete_user(self, discord_id: str) -> None:
         with self._conn() as c:
             c.execute("DELETE FROM uploads WHERE user_id=?", (discord_id,))
+            c.execute("DELETE FROM trophies WHERE user_id=?", (discord_id,))
+            c.execute("DELETE FROM events WHERE user_id=?", (discord_id,))
             c.execute("DELETE FROM users WHERE discord_id=?", (discord_id,))
 
     def exclude_upload(self, upload_id: str, reason: str, by: str) -> None:
@@ -317,6 +335,53 @@ class Database:
         with self._conn() as c:
             r = c.execute("SELECT * FROM uploads WHERE user_id=? AND sha256=?", (user_id, sha256)).fetchone()
         return dict(r) if r else None
+
+    # ------------------------------------------------------------- Trophäen
+    def trophies(self, user_id: str = "", include_revoked: bool = False) -> list[dict[str, Any]]:
+        where, args = [], []
+        if user_id:
+            where.append("user_id=?")
+            args.append(user_id)
+        if not include_revoked:
+            where.append("revoked_at IS NULL")
+        sql = "SELECT * FROM trophies" + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY earned_at"
+        with self._conn() as c:
+            return [dict(r) for r in c.execute(sql, args).fetchall()]
+
+    def award_trophy(self, user_id: str, trophy_id: str, tier: int | None) -> None:
+        with self._conn() as c:
+            c.execute(
+                """INSERT INTO trophies(user_id, trophy_id, tier, earned_at) VALUES(?,?,?,?)
+                   ON CONFLICT(user_id, trophy_id) DO UPDATE SET tier=excluded.tier, earned_at=excluded.earned_at, seen_at=NULL""",
+                (user_id, trophy_id, tier, now()),
+            )
+
+    def unseen_trophies(self, user_id: str) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute("SELECT * FROM trophies WHERE user_id=? AND seen_at IS NULL AND revoked_at IS NULL ORDER BY earned_at",
+                             (user_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_trophies_seen(self, user_id: str) -> None:
+        with self._conn() as c:
+            c.execute("UPDATE trophies SET seen_at=? WHERE user_id=? AND seen_at IS NULL", (now(), user_id))
+
+    def revoke_trophy(self, user_id: str, trophy_id: str, revoke: bool = True) -> None:
+        with self._conn() as c:
+            c.execute("UPDATE trophies SET revoked_at=?, seen_at=COALESCE(seen_at, ?) WHERE user_id=? AND trophy_id=?",
+                      (now() if revoke else None, now(), user_id, trophy_id))
+
+    def add_event(self, user_id: str, kind: str) -> None:
+        with self._conn() as c:
+            c.execute("INSERT INTO events(user_id, kind, at) VALUES(?,?,?)", (user_id, kind, now()))
+
+    def events(self, kind: str = "") -> list[dict[str, Any]]:
+        with self._conn() as c:
+            if kind:
+                rows = c.execute("SELECT * FROM events WHERE kind=? ORDER BY at", (kind,)).fetchall()
+            else:
+                rows = c.execute("SELECT * FROM events ORDER BY at").fetchall()
+        return [dict(r) for r in rows]
 
     def uploads_for_user(self, user_id: str) -> list[dict[str, Any]]:
         with self._conn() as c:

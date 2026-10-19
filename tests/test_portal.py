@@ -542,6 +542,52 @@ class TestPortal(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertIn("Speicher und Aufbewahrung", b.req("/admin/einstellungen")[2])
 
+    def test_14_trophies(self) -> None:
+        from setup_engineer.web import trophies
+        from setup_engineer.web.db import Database
+
+        b, csrf = self.member()
+        db = Database(self.settings.db_path)
+        trophies.evaluate(db)
+        own = {t["trophy_id"]: t for t in db.trophies(user_id=MEMBER["id"])}
+        # A-B-A im Auto + Garagen-Test (test_05/06), doppelte Datei (test_05)
+        for tid in ("test", "box", "allround", "pionier", "stein", "dejavu"):
+            self.assertIn(tid, own, tid)
+        # Pop-up: neue Trophäen stehen in der Seite, nach „gesehen“ nicht mehr
+        _, _, html = b.req("/meine-daten")
+        self.assertIn('id="new-trophies"', html)
+        self.assertIn("Pionier", html)
+        status, _, _ = b.req("/api/pokale/gesehen", b"", {"x-csrf-token": csrf_from(html)}, "POST")
+        self.assertEqual(status, 200)
+        self.assertNotIn('id="new-trophies"', b.req("/meine-daten")[2])
+        # Pokalschrank und Bestenliste (nur für Angemeldete)
+        status, _, html = b.req("/pokale")
+        self.assertEqual(status, 200)
+        self.assertIn("Testfahrer", html)
+        self.assertIn("data-trophy", html)
+        self.assertNotIn("Grüne Hölle", html)  # nichts zeigen, was man nicht hat
+        status, _, html = b.req("/bestenliste")
+        self.assertEqual(status, 200)
+        self.assertIn("Racer #1", html)
+        self.assertIn("Bronze: 1 Test.", b.req("/pokale")[2])
+        self.assertEqual(Browser(self.base).req("/bestenliste")[0], 303)
+        # Punkte: 10 je Test + Trophäen
+        state = trophies.compute(db)
+        totals = trophies.user_totals(db, state["metrics"])
+        me = totals[MEMBER["id"]]
+        m = state["metrics"][MEMBER["id"]]
+        self.assertEqual(me["total"], int(m["tests"]) * 10 + int(m["archive_tests"]) * 5 + me["trophy_pts"])
+        # Aberkennen: bleibt weg, auch nach erneuter Berechnung
+        _, _, html = b.req(f"/admin/teilnehmer/{MEMBER['id']}")
+        self.assertIn("Aberkennen", html)
+        b.form("/admin/aktion", {"csrf": csrf_from(html), "action": "trophaee_aberkennen", "user_id": MEMBER["id"],
+                                 "trophy_id": "dejavu", "back": "/admin"})
+        trophies.evaluate(db)
+        self.assertNotIn("dejavu", {t["trophy_id"] for t in db.trophies(user_id=MEMBER["id"])})
+        # Katalog: Trophäen je Auto und Klasse haben Namen und Punkte
+        self.assertEqual(trophies.info("champ:Porsche 963 GTP")["pts"], 150)
+        self.assertEqual(trophies.points("test", 2), 10 + 25 + 50)
+
     def _multipart(self, files, fields, csrf):
         boundary = uuid.uuid4().hex
         parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in fields.items()]

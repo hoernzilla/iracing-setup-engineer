@@ -536,3 +536,65 @@ ul.plain.bad li::marker { color: var(--bremse); content: "✕  "; }
 .keep-info p { margin: .7rem 0 0; }
 .notice.urgent { border-left-color: var(--bremse); margin: 1rem 0 0; }
 .stack > .btn { justify-self: start; }
+
+/* ---------------------------------------------------------------- Trophäen */
+.trophy-kpis { margin-bottom: .8rem; }
+.trophy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1rem; margin-top: 1.6rem; }
+.trophy-case { background: var(--asphalt-2); border-radius: 10px; padding: 1rem .9rem; display: grid; gap: .3rem; justify-items: center; text-align: center; align-content: start; min-width: 0; }
+.trophy-case svg { width: 120px; height: 150px; }
+.trophy-case b { font-size: 1.1rem; font-stretch: 74%; line-height: 1.15; }
+.trophy-case .tier { color: var(--gelb); font-weight: 700; font-size: .9rem; }
+.trophy-case .desc { color: var(--grau); font-size: .86rem; line-height: 1.35; }
+.trophy-case .when { color: var(--grau); font-size: .78rem; }
+.trophy-case .bar { width: 100%; height: 6px; border-radius: 3px; background: var(--asphalt-3); overflow: hidden; }
+.trophy-case .bar i { display: block; height: 100%; background: var(--gelb); }
+.tag { font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--lila); }
+.tag.team { color: var(--gelb); } .tag.panne { color: var(--bremse); }
+.pts { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--gelb); font-size: .88rem; }
+.teaser { margin-top: 2rem; padding: 1rem 1.2rem; border: 1px dashed var(--line); border-radius: 8px; color: var(--grau); }
+.board-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 2rem; margin-top: 1.6rem; }
+@media (max-width: 52rem) { .board-cols { grid-template-columns: minmax(0, 1fr); } }
+.board { width: 100%; border-collapse: collapse; }
+.board th { text-align: left; font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; color: var(--grau); font-weight: 600; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
+.board td { padding: .55rem .6rem; border-bottom: 1px solid var(--asphalt-3); vertical-align: middle; }
+.board .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.board .rank { font-size: 1.4rem; font-stretch: 62%; font-weight: 800; color: var(--grau); width: 2.4rem; }
+.board tr:nth-child(1) .rank { color: var(--gelb); } .board tr:nth-child(2) .rank { color: #c9d2dc; } .board tr:nth-child(3) .rank { color: #c8834a; }
+.board tr.is-me td { background: var(--asphalt-2); }
+.lic { display: inline-block; min-width: 2.2rem; text-align: center; border-radius: 4px; padding: .05em .4em; font-weight: 700; font-size: .85rem; background: var(--asphalt-3); }
+.mini { display: inline-flex; gap: .2rem; flex-wrap: wrap; }
+.mini svg { width: 30px; height: 38px; }
+.feed { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: .6rem; }
+.feed li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: .7rem; align-items: center; background: var(--asphalt-2); border-radius: 8px; padding: .5rem .7rem; }
+.feed svg { width: 34px; height: 42px; }
+.feed span { color: var(--grau); font-size: .88rem; display: block; }
+
+.trophy-stage { position: fixed; inset: 0; display: grid; place-items: center; z-index: 50;
+  background: radial-gradient(ellipse at 50% 45%, rgba(27,35,46,.75), rgba(10,14,20,.94)); padding: 16px; }
+.trophy-stage[hidden] { display: none; }
+#fx-back, #fx-front { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#fx-back { z-index: 51; } #fx-front { z-index: 54; }
+.trophy-stage .rays { position: absolute; z-index: 52; width: 34rem; height: 34rem; max-width: 140vw; max-height: 140vw; left: 50%; top: 42%;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, var(--ray) 0deg 7deg, transparent 7deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 0 18%, transparent 62%); mask: radial-gradient(circle, #000 0 18%, transparent 62%); opacity: .5; }
+.trophy-card { position: relative; z-index: 53; width: min(27rem, 100%); text-align: center; display: grid; justify-items: center; gap: .45rem; }
+.trophy-card .kicker { margin: 0; color: var(--ray-solid); letter-spacing: .18em; }
+.trophy-card h2 { font-size: clamp(2rem, 6vw, 2.8rem); font-stretch: 62%; font-weight: 800; margin: 0; }
+.trophy-card p { margin: 0; color: var(--grau); max-width: 23rem; }
+.trophy-card .tier-name { font-weight: 700; color: var(--ray-solid); }
+.trophy-card .trophy-count { color: var(--grau); font-size: .85rem; }
+.trophy-big { width: 15rem; height: 18.75rem; max-width: 70vw; filter: drop-shadow(0 18px 30px rgba(0,0,0,.55)); }
+@media (prefers-reduced-motion: no-preference) {
+  .trophy-stage:not([hidden]) .trophy-big { animation: tr-pop 1.1s cubic-bezier(.2, 1.4, .4, 1) both; }
+  .trophy-stage:not([hidden]) .rays { animation: tr-spin 18s linear infinite, tr-rays .8s ease-out both; }
+  .trophy-stage:not([hidden]) .trophy-card > :not(.trophy-big) { animation: tr-up .5s ease-out both; animation-delay: .55s; }
+  .trophy-stage.big:not([hidden]) .trophy-big { animation: tr-pop-big 1.6s cubic-bezier(.2, 1.3, .4, 1) both; }
+  .trophy-stage.panne:not([hidden]) .trophy-big { animation: tr-wobble 1.4s ease-out both; }
+}
+@keyframes tr-pop { 0% { transform: translateY(60px) scale(.15) rotate(-14deg); opacity: 0; } 55% { transform: translateY(-14px) scale(1.16) rotate(4deg); opacity: 1; } 75% { transform: translateY(4px) scale(.96) rotate(-1deg); } 100% { transform: none; } }
+@keyframes tr-pop-big { 0% { transform: scale(.05) rotate(-540deg); opacity: 0; filter: brightness(3); } 60% { transform: scale(1.2) rotate(10deg); opacity: 1; filter: brightness(1.6) drop-shadow(0 0 40px var(--ray-solid)); } 100% { transform: none; filter: drop-shadow(0 18px 30px rgba(0,0,0,.55)); } }
+@keyframes tr-wobble { 0% { transform: translateY(-120px) rotate(-30deg); opacity: 0; } 30% { transform: translateY(10px) rotate(14deg); opacity: 1; } 45% { transform: rotate(-10deg); } 60% { transform: rotate(7deg); } 75% { transform: rotate(-4deg); } 100% { transform: none; } }
+@keyframes tr-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@keyframes tr-rays { from { opacity: 0; } to { opacity: .5; } }
+@keyframes tr-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

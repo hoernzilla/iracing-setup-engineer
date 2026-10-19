@@ -28,7 +28,7 @@ from .. import __version__
 from ..classes import GT3_EXCLUDE, GT3_MARKER, GTP_MARKERS
 from ..ibt import IbtError, IbtFile
 from ..recommend.history import History
-from . import discord, progress, retention
+from . import discord, progress, retention, trophies
 from .config import Settings, load_settings
 from .db import Database, now
 from .worker import DONE, FAILED, QUEUED, Worker, report_text
@@ -190,7 +190,14 @@ def create_app(settings: Settings | None = None) -> Starlette:
             max_upload_mb=max_mb(),
             max_files=max_files(),
         )
+        if user and user.get("consent_at") and not is_banned(user) and "new_trophies" not in ctx:
+            ctx["new_trophies"] = [trophies.display(t["trophy_id"], t["tier"]) for t in db.unseen_trophies(user["discord_id"])]
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
+
+    def update_trophies() -> None:
+        trophies.evaluate(db, s.timezone)
+
+    worker.on_change = update_trophies
 
     def message(request: Request, title: str, text: str, status_code: int = 200, action: tuple[str, str] | None = None) -> Response:
         return render(request, "message.html", status_code=status_code, title=title, text=text, action=action)
@@ -330,6 +337,9 @@ def create_app(settings: Settings | None = None) -> Starlette:
         if isinstance(user, Response):
             return user
         uploads = db.uploads_for_user(user["discord_id"])
+        if any(u["status"] in (QUEUED, "läuft") for u in uploads):
+            db.add_event(user["discord_id"], "reload_wait")
+            await asyncio.to_thread(update_trophies)
         rcfg = retention.config(db)
         for u in uploads:
             u["ab"] = json.loads(u["ab_summary"]) if u["ab_summary"] else None
@@ -511,6 +521,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             section="teilnehmer",
             p=person_view(row),
             uploads=[upload_view(u) for u in db.all_uploads(user_id=uid)],
+            person_trophies=[dict(t, d=trophies.display(t["trophy_id"], t["tier"])) for t in db.trophies(user_id=uid, include_revoked=True)],
             log=db.log_entries(limit=50, target_user=uid),
             self_view=uid == user["discord_id"],
         )
@@ -746,6 +757,12 @@ def create_app(settings: Settings | None = None) -> Starlette:
         elif action == "leitfaden_zuruecksetzen":
             db.reset_guidelines(target["discord_id"])
             db.log(admin_user, "Leitfaden muss neu bestätigt werden", target, detail=reason)
+        elif action in ("trophaee_aberkennen", "trophaee_zurueck"):
+            tid = str(form.get("trophy_id") or "")
+            revoke = action == "trophaee_aberkennen"
+            db.revoke_trophy(target["discord_id"], tid, revoke)
+            name = (trophies.info(tid) or {}).get("name", tid)
+            db.log(admin_user, f"Trophäe {'aberkannt' if revoke else 'zurückgegeben'}: {name}", target, detail=reason)
         elif action == "notiz":
             note = str(form.get("note") or "").strip()[:2000]
             db.set_user_note(target["discord_id"], note)
@@ -753,6 +770,61 @@ def create_app(settings: Settings | None = None) -> Starlette:
         else:
             return deny("Unbekannte Aktion.")
         return RedirectResponse(back, status_code=303)
+
+    # -------------------------------------------------------------- Trophäen
+    ORDER = {"auto": 0, "team": 1, "einmalig": 2, "geheim": 3, "stufe": 4, "panne": 5}
+
+    def trophy_state() -> tuple[dict, dict]:
+        state = trophies.compute(db, s.timezone)
+        return state["metrics"], trophies.user_totals(db, state["metrics"])
+
+    async def cabinet(request: Request) -> Response:
+        user = require_user(request)
+        if isinstance(user, Response):
+            return user
+        metrics, totals = await asyncio.to_thread(trophy_state)
+        uid = user["discord_id"]
+        me = totals.get(uid) or dict(total=0, license="R", trophies=[], tests=0, trophy_pts=0)
+        rank = next((i + 1 for i, t in enumerate(trophies.ranking(totals)) if t["uid"] == uid), None)
+        cards = []
+        for t in sorted(me["trophies"], key=lambda t: (ORDER.get(trophies.display(t["trophy_id"], t["tier"])["kind"], 9), t["earned_at"])):
+            d = trophies.display(t["trophy_id"], t["tier"])
+            cards.append(dict(d=d, json=json.dumps(d), when=t["earned_at"], total_pts=trophies.points(t["trophy_id"], t["tier"]),
+                              progress=trophies.progress_of(t["trophy_id"], t["tier"], metrics.get(uid, {}))))
+        m = metrics.get(uid, {})
+        return render(request, "pokale.html", uses_trophies=True, me=me, rank=rank, cards=cards, test_pts=int(m.get("tests", 0)) * trophies.TEST_PTS,
+                      archive_pts=int(m.get("archive_tests", 0)) * trophies.ARCHIVE_TEST_PTS)
+
+    async def leaderboard(request: Request) -> Response:
+        user = require_user(request)
+        if isinstance(user, Response):
+            return user
+        _, totals = await asyncio.to_thread(trophy_state)
+        rows = []
+        for t in trophies.ranking(totals)[:10]:
+            best = sorted(t["trophies"], key=lambda x: -trophies.points(x["trophy_id"], x["tier"]))[:6]
+            rows.append(dict(t, me=t["uid"] == user["discord_id"],
+                             best=[json.dumps(trophies.display(b["trophy_id"], b["tier"])) for b in best],
+                             best_names=[trophies.display(b["trophy_id"], b["tier"])["name"] for b in best]))
+        # Zuletzt entdeckt: wer eine Trophäe als Erster bekommen hat (Stufen-Trophäen nicht)
+        first: dict[str, dict] = {}
+        names = {t["uid"]: t["name"] for t in totals.values()}
+        for t in db.trophies():
+            d = trophies.display(t["trophy_id"], t["tier"])
+            if d["kind"] == "stufe" or t["user_id"] not in names:
+                continue
+            key = t["trophy_id"] if d["kind"] != "team" else f'{t["trophy_id"]}:{t["tier"]}'
+            if key not in first:
+                first[key] = dict(d=d, json=json.dumps(d), when=t["earned_at"], who="Team" if d["kind"] == "team" else names[t["user_id"]])
+        feed = sorted(first.values(), key=lambda x: x["when"], reverse=True)[:8]
+        return render(request, "bestenliste.html", uses_trophies=True, rows=rows, feed=feed)
+
+    async def api_trophies_seen(request: Request) -> Response:
+        user = current_user(request)
+        if user is None or not csrf_ok(request, request.headers.get("x-csrf-token")):
+            return JSONResponse({"ok": False}, status_code=400)
+        db.mark_trophies_seen(user["discord_id"])
+        return JSONResponse({"ok": True})
 
     async def privacy(request: Request) -> Response:
         return render(request, "privacy.html")
@@ -831,6 +903,8 @@ def create_app(settings: Settings | None = None) -> Starlette:
             dup = db.find_duplicate(user["discord_id"], digest)
             if dup is not None and test_type != "garage":
                 dest.unlink(missing_ok=True)
+                db.add_event(user["discord_id"], "dup")
+                await asyncio.to_thread(update_trophies)
                 items.append({"filename": name, "ok": True, "id": dup["id"], "status": dup["status"], "message": "Schon hochgeladen."})
                 continue
             try:
@@ -883,6 +957,7 @@ def create_app(settings: Settings | None = None) -> Starlette:
             try:
                 res = await asyncio.to_thread(retention.run, db)
                 db.set_setting("retention_last_run", now())
+                await asyncio.to_thread(update_trophies)
                 if res["removed"] or res["flagged"]:
                     log.info("Aufräumen: %s", res)
                     db.log({"discord_id": "system", "username": "Automatik"}, "Rohdateien aufgeräumt",
@@ -914,6 +989,9 @@ def create_app(settings: Settings | None = None) -> Starlette:
         Route("/archiv", archive_page),
         Route("/download/telemetrie-pruefen", download_script),
         Route("/fortschritt", progress_page),
+        Route("/pokale", cabinet),
+        Route("/bestenliste", leaderboard),
+        Route("/api/pokale/gesehen", api_trophies_seen, methods=["POST"]),
         Route("/admin", admin_home),
         Route("/admin/teilnehmer", admin_people),
         Route("/admin/teilnehmer/{uid}", admin_person),

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Mein Pokalschrank{% endblock %}
+{% block content %}
+<div class="wrap page">
+  <p class="kicker">Mein Pokalschrank</p>
+  <h1>{{ user.display_name or user.username }}</h1>
+  <dl class="kpis trophy-kpis">
+    <div><dt>Punkte</dt><dd>{{ "{:,}".format(me.total).replace(",", ".") }}</dd></div>
+    <div><dt>Lizenz</dt><dd>{{ me.license }}</dd></div>
+    <div><dt>Trophäen</dt><dd>{{ cards | length }}</dd></div>
+    <div><dt>Platz</dt><dd>{% if rank %}{{ rank }}.{% else %}–{% endif %}</dd></div>
+  </dl>
+  <p class="fine">Punkte: {{ test_pts }} für komplette Tests{% if archive_pts %}, {{ archive_pts }} für Tests aus Altdaten{% endif %}, {{ me.trophy_pts }} für Trophäen.
+    Lizenz D ab 100, C ab 250, B ab 500, A ab 900, Pro ab 1.400 Punkten. <a href="/bestenliste">Zur Bestenliste</a></p>
+
+  {% if cards %}
+  <div class="trophy-grid">
+    {% for c in cards %}
+    <article class="trophy-case kind-{{ c.d.kind }}">
+      <svg viewBox="0 0 160 200" role="img" aria-label="{{ c.d.name }}" data-trophy='{{ c.json }}'></svg>
+      {% if c.d.kind == "team" %}<span class="tag team">Team</span>{% elif c.d.kind == "geheim" %}<span class="tag">Geheim</span>{% elif c.d.kind == "panne" %}<span class="tag panne">Panne</span>{% elif c.d.kind == "auto" %}<span class="tag team">Champion</span>{% endif %}
+      <b>{{ c.d.name }}</b>
+      {% if c.d.tier %}<span class="tier">{{ c.d.tier }}</span>{% endif %}
+      <span class="desc">{{ c.d.desc }}</span>
+      <span class="pts">{{ c.total_pts }} Punkte</span>
+      {% if c.progress %}
+        <span class="desc">Bis {{ c.progress.tier }}: noch {{ c.progress.missing }} {{ c.progress.unit }}</span>
+        <span class="bar" aria-hidden="true"><i style="width: {{ c.progress.pct }}%"></i></span>
+      {% endif %}
+      <span class="when">seit {{ c.when | datum }}</span>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="notice">Noch leer. Die erste Trophäe gibt es für deinen ersten kompletten A-B-A-Test – <a href="/leitfaden">so geht er</a>.</p>
+  {% endif %}
+  <p class="teaser">Da draußen gibt es noch mehr Trophäen – manche hat noch niemand gefunden. Welche, verraten wir nicht.</p>
+</div>
+{% endblock %}

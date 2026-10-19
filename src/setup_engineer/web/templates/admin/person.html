@@ -28,6 +28,28 @@
     <div><dt>Speicher</dt><dd>{{ "%.0f"|format(p.bytes / 1048576) }}<small> MB</small></dd></div>
   </dl>
 
+  {% if person_trophies %}
+  <section class="block">
+    <h2>Trophäen</h2>
+    <p class="fine">Aberkennen nur bei Manipulation. Aberkannte Trophäen werden nicht automatisch neu vergeben.</p>
+    <div class="table-scroll"><table class="timing admin-table">
+      <thead><tr><th>Trophäe</th><th>Stufe</th><th>Seit</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for t in person_trophies %}
+        <tr><td>{{ t.d.name }}</td><td>{{ t.d.tier or "–" }}</td><td>{{ t.earned_at | datum }}</td>
+          <td>{% if t.revoked_at %}<span class="state state-fehler">aberkannt</span>{% else %}<span class="state state-fertig">aktiv</span>{% endif %}</td>
+          <td><form method="post" action="/admin/aktion" class="inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="user_id" value="{{ p.discord_id }}">
+            <input type="hidden" name="back" value="{{ back }}"><input type="hidden" name="trophy_id" value="{{ t.trophy_id }}">
+            {% if t.revoked_at %}<button type="submit" name="action" value="trophaee_zurueck" class="btn btn-small">Zurückgeben</button>
+            {% else %}<button type="submit" name="action" value="trophaee_aberkennen" class="btn btn-small btn-danger">Aberkennen</button>{% endif %}
+          </form></td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
   <div class="admin-cols">
     <section class="block panel">
       <h2>Notiz</h2>
